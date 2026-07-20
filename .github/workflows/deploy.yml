@@ -1,0 +1,27 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy (release_command in fly.toml runs `alembic upgrade head`)
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
