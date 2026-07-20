@@ -1,3 +1,5 @@
+from datetime import UTC
+
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -43,7 +45,7 @@ async def test_project_scoping_end_to_end(db_session):
     db_session.add(channel)
     await db_session.flush()
 
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     db_session.add(
         Message(
@@ -52,7 +54,7 @@ async def test_project_scoping_end_to_end(db_session):
             discord_message_id="msg-1",
             author_id="user-1",
             content="let's go with Postgres",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
     )
     await db_session.commit()

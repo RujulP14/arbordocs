@@ -5,8 +5,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.session import async_session
 from app.db.models import User
+from app.db.session import async_session
 from app.ingestion.github.client import github_app_client
 
 router = APIRouter(prefix="/auth/github", tags=["auth"])

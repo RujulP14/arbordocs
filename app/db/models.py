@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, JSON, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -10,7 +10,7 @@ JsonColumn = JSON().with_variant(JSONB(), "postgresql")
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Base(DeclarativeBase):
@@ -43,7 +43,9 @@ class Project(Base):
     github_installation: Mapped["GitHubInstallation | None"] = relationship(
         back_populates="project", uselist=False, cascade="all, delete-orphan"
     )
-    channels: Mapped[list["ProjectChannel"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    channels: Mapped[list["ProjectChannel"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class GitHubInstallation(Base):
@@ -75,7 +77,9 @@ class ProjectChannel(Base):
     __tablename__ = "project_channels"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
     discord_guild_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("discord_guilds.id"), nullable=False
     )
@@ -93,7 +97,9 @@ class Message(Base):
     __table_args__ = (Index("ix_messages_project_channel_created", "project_id", "channel_id", "created_at"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
     channel_id: Mapped[str] = mapped_column(String(64), nullable=False)
     discord_message_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     author_id: Mapped[str] = mapped_column(String(64), nullable=False)

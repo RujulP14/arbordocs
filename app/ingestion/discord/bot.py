@@ -71,9 +71,7 @@ class ArborDocsBot(discord.Client):
 
     async def _store_message(self, message: discord.Message, project_id) -> None:
         async with async_session() as db:
-            existing = await db.scalar(
-                select(Message).where(Message.discord_message_id == str(message.id))
-            )
+            existing = await db.scalar(select(Message).where(Message.discord_message_id == str(message.id)))
             if existing:
                 return
 
@@ -86,12 +84,8 @@ class ArborDocsBot(discord.Client):
                     author_name=str(message.author),
                     author_roles=[r.name for r in getattr(message.author, "roles", [])],
                     content=message.content,
-                    reply_to_message_id=(
-                        str(message.reference.message_id) if message.reference else None
-                    ),
-                    reactions=[
-                        {"emoji": str(r.emoji), "count": r.count} for r in message.reactions
-                    ],
+                    reply_to_message_id=(str(message.reference.message_id) if message.reference else None),
+                    reactions=[{"emoji": str(r.emoji), "count": r.count} for r in message.reactions],
                     created_at=message.created_at,
                 )
             )
