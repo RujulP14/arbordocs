@@ -67,7 +67,7 @@ jobs:
       GITHUB_APP_SLUG: ci-test
       GITHUB_APP_CLIENT_ID: ci-test
       GITHUB_APP_CLIENT_SECRET: ci-test
-      GITHUB_APP_PRIVATE_KEY_PATH: ""
+      GITHUB_APP_PRIVATE_KEY_B64: ""
       GITHUB_WEBHOOK_SECRET: ci-test
       DISCORD_BOT_TOKEN: ""
       DISCORD_OAUTH_CLIENT_ID: ci-test
