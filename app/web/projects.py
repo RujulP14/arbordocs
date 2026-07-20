@@ -19,9 +19,7 @@ async def list_projects(
     request: Request, user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)
 ):
     projects = await db.scalars(select(Project).order_by(Project.created_at.desc()))
-    return templates.TemplateResponse(
-        request, "dashboard.html", {"user": user, "projects": projects.all()}
-    )
+    return templates.TemplateResponse(request, "dashboard.html", {"user": user, "projects": projects.all()})
 
 
 @router.post("")
@@ -49,6 +47,4 @@ async def project_detail(
         .where(Project.id == project_id)
         .options(selectinload(Project.github_installation), selectinload(Project.channels))
     )
-    return templates.TemplateResponse(
-        request, "project_detail.html", {"user": user, "project": project}
-    )
+    return templates.TemplateResponse(request, "project_detail.html", {"user": user, "project": project})

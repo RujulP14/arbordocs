@@ -5,7 +5,6 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.db.models import GitHubInstallation, Project, User
 from app.db.session import get_db
 from app.ingestion.github.client import github_app_client
