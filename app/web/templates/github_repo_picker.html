@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Pick a repo — ArborDocs{% endblock %}
+{% block content %}
+  <h1>Pick a repo for {{ project.name }}</h1>
+  <form method="post" action="/integrations/github/attach/{{ project.id }}">
+    <input type="hidden" name="installation_id" value="{{ installation_id }}">
+    <ul class="repo-picker">
+      {% for repo in repos %}
+        <li>
+          <label>
+            <input type="radio" name="repo_full_name" value="{{ repo.full_name }}" required>
+            {{ repo.full_name }}
+          </label>
+        </li>
+      {% else %}
+        <li class="empty">No repositories were granted to this installation.</li>
+      {% endfor %}
+    </ul>
+    <button type="submit">Attach repo</button>
+  </form>
+{% endblock %}

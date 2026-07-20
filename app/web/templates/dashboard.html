@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Projects — ArborDocs{% endblock %}
+{% block content %}
+  <h1>Projects</h1>
+
+  <form method="post" action="/projects" class="new-project-form">
+    <input type="text" name="name" placeholder="Project name" required>
+    <input type="text" name="description" placeholder="Description (optional)">
+    <button type="submit">Create project</button>
+  </form>
+
+  <ul class="project-list">
+    {% for project in projects %}
+      <li><a href="/projects/{{ project.id }}">{{ project.name }}</a></li>
+    {% else %}
+      <li class="empty">No projects yet — create one above.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Pick channels — ArborDocs{% endblock %}
+{% block content %}
+  <h1>Pick channels for {{ project.name }}</h1>
+  <p>Server: {{ guild.guild_name or guild.guild_id }}</p>
+  <form method="post" action="/integrations/discord/attach/{{ project.id }}">
+    <input type="hidden" name="discord_guild_id" value="{{ guild.id }}">
+    <ul class="channel-picker">
+      {% for ch in channels %}
+        <li>
+          <label>
+            <input type="checkbox" name="channels" value="{{ ch.id }}|{{ ch.name }}">
+            #{{ ch.name }}
+          </label>
+        </li>
+      {% else %}
+        <li class="empty">No text channels found in this server.</li>
+      {% endfor %}
+    </ul>
+    <button type="submit">Attach channels</button>
+  </form>
+{% endblock %}

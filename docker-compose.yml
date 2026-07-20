@@ -1,0 +1,19 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: arbordocs
+      POSTGRES_PASSWORD: arbordocs
+      POSTGRES_DB: arbordocs
+    ports:
+      - "5432:5432"
+    volumes:
+      - arbordocs_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arbordocs"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  arbordocs_pgdata:

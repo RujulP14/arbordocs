@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — ArborDocs{% endblock %}
+{% block content %}
+  <h1>{{ project.name }}</h1>
+  {% if project.description %}<p>{{ project.description }}</p>{% endif %}
+
+  <section>
+    <h2>GitHub</h2>
+    {% if project.github_installation %}
+      <p>Connected: <code>{{ project.github_installation.repo_full_name }}</code></p>
+      <a href="/integrations/github/connect/{{ project.id }}">Change repo</a>
+    {% else %}
+      <a href="/integrations/github/connect/{{ project.id }}" class="button">Connect GitHub</a>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Discord channels</h2>
+    {% if project.channels %}
+      <ul>
+        {% for ch in project.channels %}
+          <li>#{{ ch.channel_name or ch.channel_id }} <span class="tier">{{ ch.authority_tier }}</span></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <a href="/integrations/discord/connect/{{ project.id }}" class="button">Add to Discord</a>
+  </section>
+{% endblock %}
