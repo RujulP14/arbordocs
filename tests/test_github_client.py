@@ -1,3 +1,5 @@
+import base64
+
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -6,21 +8,19 @@ from app.config import settings
 from app.ingestion.github import client as github_client
 
 
-def _write_test_key(tmp_path) -> str:
+def _generate_test_key_b64() -> tuple[str, object]:
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     pem = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    path = tmp_path / "test-key.pem"
-    path.write_bytes(pem)
-    return str(path), key.public_key()
+    return base64.b64encode(pem).decode("utf-8"), key.public_key()
 
 
-def test_sign_app_jwt_shape(tmp_path, monkeypatch):
-    key_path, public_key = _write_test_key(tmp_path)
-    monkeypatch.setattr(settings, "github_app_private_key_path", key_path)
+def test_sign_app_jwt_shape(monkeypatch):
+    key_b64, public_key = _generate_test_key_b64()
+    monkeypatch.setattr(settings, "github_app_private_key_b64", key_b64)
     monkeypatch.setattr(settings, "github_app_id", "12345")
 
     token = github_client.sign_app_jwt()

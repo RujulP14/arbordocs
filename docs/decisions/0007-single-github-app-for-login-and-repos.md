@@ -23,8 +23,12 @@ per-project repo access (see [ADR-0005](0005-multi-tenant-projects.md)).
 
 - One registration on GitHub's developer settings, one client id/secret pair
   (`GITHUB_APP_CLIENT_ID` / `GITHUB_APP_CLIENT_SECRET`), alongside the App's
-  own `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY_PATH` / `GITHUB_WEBHOOK_SECRET`.
-  No separate OAuth-App credentials to manage.
+  own `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY_B64` / `GITHUB_WEBHOOK_SECRET`.
+  No separate OAuth-App credentials to manage. The private key is stored
+  base64-encoded (not as a file path) so the same env-var-based secret
+  mechanism works identically in local `.env` and in a deployed platform's
+  secrets store (e.g. `fly secrets set`) — no file needs to be placed on disk
+  in either environment.
 - Login and repo-installation are still functionally separate flows in the
   app (different redirect URLs, different scopes requested), they just share
   one underlying GitHub-side registration.

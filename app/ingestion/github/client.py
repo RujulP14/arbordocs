@@ -1,3 +1,4 @@
+import base64
 import time
 
 import httpx
@@ -9,8 +10,7 @@ GITHUB_API = "https://api.github.com"
 
 
 def _load_private_key() -> str:
-    with open(settings.github_app_private_key_path) as f:
-        return f.read()
+    return base64.b64decode(settings.github_app_private_key_b64).decode("utf-8")
 
 
 def sign_app_jwt() -> str:
