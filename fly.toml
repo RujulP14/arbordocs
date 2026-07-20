@@ -1,0 +1,29 @@
+app = "arbordocs"
+primary_region = "iad"
+
+[build]
+
+[deploy]
+  release_command = "alembic upgrade head"
+
+[processes]
+  web = "uvicorn app.web.main:app --host 0.0.0.0 --port 8000"
+  bot = "python -m app.ingestion.discord.bot"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["web"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["web"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["bot"]
