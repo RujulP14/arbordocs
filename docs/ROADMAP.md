@@ -28,9 +28,25 @@ is checked off.
       on the reaction signal, and flagged as a candidate on all three signal
       types (keyword, embedding similarity ~0.71, reaction). `worker` runs
       locally only in this pass — not yet deployed to Fly.
-- [ ] **Phase 3 — Eval harness + labeled dataset.**
-      Build this early — it tells you whether later stages actually work.
-      Get decision-detection F1 measurable before writing Stage 2/3.
+- [x] **Phase 3 — Eval harness + labeled dataset.**
+      Seeded synthetic dataset (`eval/dataset.py`, 24 labeled threads across
+      technical/policy/process/product decisions and open-question/
+      unresolved-proposal/provisional/joke/status-update/casual non-decisions)
+      + harness (`eval/harness.py`, `uv run python -m eval.harness
+      [--verbose]`) that runs each thread through the real Stage 0 + Stage 1
+      pipeline (real embedding model, not test fakes) and reports
+      decision-detection precision/recall/F1 via `sklearn`. Current numbers:
+      **precision=0.73, recall=1.00, F1=0.85** — all four misses are
+      false positives on jokes/casual chat using decision-like phrasing
+      ("final decision: pineapple doesn't belong on pizza"), which is exactly
+      the failure mode Stage 2's LLM gate (SPEC.md §8) exists to fix, not a
+      Stage 1 bug. Also reports a separate Stage 0 grouping-purity metric on
+      a deliberately interleaved multi-topic scenario (SPEC.md §7's
+      with/without-Stage-0 ablation guidance); purity=1.00 on the harness's
+      current interleaved cases, though manual testing this phase found
+      accuracy can drop into the ~65-70% range on short, low-content,
+      no-reply cross-topic messages — a known Stage 0 limitation, not yet
+      covered by a harness case.
 - [ ] **Phase 4 — Stage 2 + Stage 3.**
       LLM extraction into the schema; supersession tracking. Re-run eval, add
       the supersession-classification metric.
