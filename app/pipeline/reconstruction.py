@@ -70,9 +70,7 @@ async def assign_message_to_discussion_unit(
     # simultaneous, interleaved-but-unrelated conversations apart even
     # though both are "participants" of both units.
     strong_matches = [
-        (unit, sim)
-        for unit, sim in scored_units
-        if sim >= settings.reconstruction_similarity_threshold
+        (unit, sim) for unit, sim in scored_units if sim >= settings.reconstruction_similarity_threshold
     ]
     if strong_matches:
         best_unit, _ = max(strong_matches, key=lambda pair: pair[1])
