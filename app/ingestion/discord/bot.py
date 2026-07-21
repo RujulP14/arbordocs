@@ -4,8 +4,10 @@ import discord
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.models import Message, ProjectChannel
+from app.db.models import DiscussionUnit, Message, ProjectChannel
 from app.db.session import async_session
+from app.pipeline.candidate_filter import CHECK_MARK_EMOJI
+from app.pipeline.reconstruction import assign_message_to_discussion_unit
 
 logger = logging.getLogger("arbordocs.discord_bot")
 
@@ -75,21 +77,44 @@ class ArborDocsBot(discord.Client):
             if existing:
                 return
 
-            db.add(
-                Message(
-                    project_id=project_id,
-                    channel_id=str(message.channel.id),
-                    discord_message_id=str(message.id),
-                    author_id=str(message.author.id),
-                    author_name=str(message.author),
-                    author_roles=[r.name for r in getattr(message.author, "roles", [])],
-                    content=message.content,
-                    reply_to_message_id=(str(message.reference.message_id) if message.reference else None),
-                    reactions=[{"emoji": str(r.emoji), "count": r.count} for r in message.reactions],
-                    created_at=message.created_at,
-                )
+            row = Message(
+                project_id=project_id,
+                channel_id=str(message.channel.id),
+                discord_message_id=str(message.id),
+                author_id=str(message.author.id),
+                author_name=str(message.author),
+                author_roles=[r.name for r in getattr(message.author, "roles", [])],
+                content=message.content,
+                reply_to_message_id=(str(message.reference.message_id) if message.reference else None),
+                reactions=[{"emoji": str(r.emoji), "count": r.count} for r in message.reactions],
+                created_at=message.created_at,
             )
+            db.add(row)
+            await db.flush()
+            # Stage 0 (SPEC.md §5) — group into a discussion unit right after
+            # insert, so both live on_message and backfill go through the
+            # same reconstruction path.
+            await assign_message_to_discussion_unit(db, row)
             await db.commit()
+
+    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User) -> None:
+        if str(reaction.emoji) != CHECK_MARK_EMOJI:
+            return
+        channel_id = str(reaction.message.channel.id)
+        tracked = await self._tracked_channel_ids()
+        if channel_id not in tracked:
+            return
+
+        async with async_session() as db:
+            message_row = await db.scalar(
+                select(Message).where(Message.discord_message_id == str(reaction.message.id))
+            )
+            if message_row is None or message_row.discussion_unit_id is None:
+                return
+            unit = await db.get(DiscussionUnit, message_row.discussion_unit_id)
+            if unit is not None and unit.status == "open":
+                unit.signal_close_requested = True
+                await db.commit()
 
 
 def run() -> None:

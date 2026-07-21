@@ -1,0 +1,10 @@
+<select
+  name="authority_tier"
+  hx-post="/integrations/discord/channels/{{ ch.id }}/authority-tier"
+  hx-trigger="change"
+  hx-target="this"
+  hx-swap="outerHTML">
+  {% for tier in ("high", "medium", "low") %}
+    <option value="{{ tier }}" {% if ch.authority_tier == tier %}selected{% endif %}>{{ tier }}</option>
+  {% endfor %}
+</select>

@@ -19,7 +19,10 @@
     {% if project.channels %}
       <ul>
         {% for ch in project.channels %}
-          <li>#{{ ch.channel_name or ch.channel_id }} <span class="tier">{{ ch.authority_tier }}</span></li>
+          <li>
+            #{{ ch.channel_name or ch.channel_id }}
+            {% include "_channel_tier.html" %}
+          </li>
         {% endfor %}
       </ul>
     {% endif %}

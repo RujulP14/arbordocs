@@ -1,22 +1,6 @@
 from datetime import UTC
 
-import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-from app.db.models import Base, DiscordGuild, GitHubInstallation, Message, Project, ProjectChannel, User
-
-
-@pytest.fixture
-async def db_session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_maker() as session:
-        yield session
-
-    await engine.dispose()
+from app.db.models import DiscordGuild, GitHubInstallation, Message, Project, ProjectChannel, User
 
 
 async def test_project_scoping_end_to_end(db_session):

@@ -16,9 +16,18 @@ is checked off.
       GitHub OAuth/App and Discord bot flows still need real credentials
       (register the GitHub App + Discord bot application, fill in `.env`,
       run `scripts/seed_admin.py`) before they're exercisable end-to-end.
-- [ ] **Phase 2 — Stage 0 + Stage 1.**
-      Discussion reconstruction + cheap candidate filter. Output candidates to
-      a console/table. No LLM yet.
+- [x] **Phase 2 — Stage 0 + Stage 1.**
+      Discussion reconstruction (`app/pipeline/reconstruction.py`, run by the
+      `bot` process per-message) + cheap candidate filter (`app/pipeline/
+      candidate_filter.py`, run by the `worker` process's polling loop on
+      unit close). No LLM — local `sentence-transformers` embeddings only.
+      New tables: `discussion_units`, `candidates`; `messages` gained
+      `discussion_unit_id` + `embedding`. Verified end-to-end against real
+      Postgres + the real embedding model (not just mocked tests): a 3-message
+      decision arc with a ✅ reaction correctly grouped into one unit, closed
+      on the reaction signal, and flagged as a candidate on all three signal
+      types (keyword, embedding similarity ~0.71, reaction). `worker` runs
+      locally only in this pass — not yet deployed to Fly.
 - [ ] **Phase 3 — Eval harness + labeled dataset.**
       Build this early — it tells you whether later stages actually work.
       Get decision-detection F1 measurable before writing Stage 2/3.

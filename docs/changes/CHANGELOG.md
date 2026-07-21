@@ -5,6 +5,41 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Phase 2 implementation)
+- Postgres schema additions (Alembic migration `0002_discussion_reconstruction`):
+  `discussion_units`, `candidates` tables; `messages` gained `discussion_unit_id`
+  and `embedding` (pgvector `vector(384)`, `.with_variant(JSON, "sqlite")` for
+  fast in-memory tests). Migration also runs `CREATE EXTENSION IF NOT EXISTS
+  vector` defensively for fresh local Postgres instances.
+- `app/pipeline/embeddings.py` — lazy-loaded local `sentence-transformers`
+  singleton (`all-MiniLM-L6-v2`) + cosine similarity, injectable for tests
+  (ADR-0003: local embeddings for high-frequency Stage 0/1 use).
+- `app/pipeline/reconstruction.py` — Stage 0: groups messages into discussion
+  units via reply-chain, then temporal window + participant overlap +
+  embedding similarity fallback; opens a new unit otherwise.
+- `app/pipeline/candidate_filter.py` — Stage 1: flags a closed discussion
+  unit as a candidate on any signal (keyword phrase, embedding similarity to
+  a hardcoded exemplar-decision set, or a ✅ reaction) — tuned for recall.
+- `app/worker/main.py` — polling loop (`worker` process): closes discussion
+  units on inactivity timeout or reaction-requested signal, runs the
+  candidate filter on each newly-closed unit.
+- `app/ingestion/discord/bot.py`: `_store_message` now runs Stage 0
+  reconstruction on every stored message (live and backfill); new
+  `on_reaction_add` handler sets a unit's close signal on a ✅ reaction.
+- New config settings (`app/config.py`), all env-overridable for Phase 3
+  ablations: `embedding_model_name`, `reconstruction_inactivity_minutes`,
+  `reconstruction_similarity_threshold`, `candidate_embedding_threshold`,
+  `worker_poll_interval_seconds`.
+- `tests/conftest.py` — shared sqlite `db_session` fixture + a deterministic
+  `fake_embedder` fixture so tests never load the real model.
+- Verified end-to-end against real Postgres + the real embedding model (not
+  just unit tests): a synthetic 3-message decision arc ("should we use
+  Postgres or MySQL?" → "Postgres has better JSON support" → "ok let's go
+  with Postgres, final call" + ✅ reaction) correctly grouped into one
+  discussion unit, closed via the reaction signal, and flagged as a candidate
+  on all three signal types (keyword match, embedding similarity ~0.71,
+  reaction). `worker` process runs locally only — not yet deployed to Fly.
+
 ### Added (Phase 1 implementation)
 - Postgres schema (SQLAlchemy models + Alembic migration `0001_initial`):
   `users`, `projects`, `github_installations`, `discord_guilds`,
