@@ -14,6 +14,8 @@ from app.web.templating import templates
 
 router = APIRouter(prefix="/integrations/discord", tags=["integrations-discord"])
 
+VALID_AUTHORITY_TIERS = ("high", "medium", "low")
+
 
 def _callback_url() -> str:
     return f"{settings.base_url}/integrations/discord/callback"
@@ -92,3 +94,24 @@ async def attach(
             )
     await db.commit()
     return RedirectResponse(f"/projects/{project_id}", status_code=303)
+
+
+@router.post("/channels/{channel_id}/authority-tier")
+async def set_authority_tier(
+    request: Request,
+    channel_id: uuid.UUID,
+    authority_tier: str = Form(...),
+    user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if authority_tier not in VALID_AUTHORITY_TIERS:
+        raise HTTPException(status_code=400, detail="invalid authority_tier")
+
+    channel = await db.get(ProjectChannel, channel_id)
+    if channel is None:
+        raise HTTPException(status_code=404)
+
+    channel.authority_tier = authority_tier
+    await db.commit()
+    await db.refresh(channel)
+    return templates.TemplateResponse(request, "_channel_tier.html", {"ch": channel})

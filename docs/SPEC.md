@@ -1,9 +1,9 @@
 # ArborDocs — Project Specification
 
 > A knowledge layer that captures **decisions from team chat** and reconciles them
-> against the **codebase**. Built as a portfolio/resume project. This document is
-> the single source of truth for the build — it is written to be handed directly
-> to a coding agent (Claude Code) as context.
+> against the **codebase**. This document is the single source of truth for the
+> build — it is written to be handed directly to a coding agent (Claude Code)
+> as context.
 
 ---
 
@@ -215,7 +215,7 @@ defensible, deliberate v1 choice.
 
 ---
 
-## 7. Evaluation (three separate metrics — this is the resume centerpiece)
+## 7. Evaluation (three separate metrics — the centerpiece of the project)
 
 Do not skip measurement; it's what separates this from an LLM wrapper. Source a
 public Discord export (or seed synthetic decision threads) and hand-label.
@@ -301,7 +301,7 @@ reference the original; and why channel-scoping stands in for a permissions mode
 
 ---
 
-## 12. Positioning notes (for interviews / README)
+## 12. Positioning notes (for README / project summary)
 
 - Frame ingestion as "chat platforms (Discord, Slack)" — Discord chosen because
   its API is open; the ingestion layer is adapter-based.

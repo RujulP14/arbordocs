@@ -21,7 +21,7 @@ future extension, but it is explicitly out of scope now.
 
 - The differentiator is cross-source reconciliation (chat decision vs. code
   reality), not breadth of ingestion. This is what makes the project
-  finishable by one person and defensible in an interview.
+  finishable by one person and easy to reason about end-to-end.
 - GitHub's role is strictly "ground truth to check against" — it is not a
   target the system auto-updates.
 - Adding Slack later is a real but deliberately deferred stretch item (see
