@@ -185,12 +185,14 @@ class Candidate(Base):
 
 
 class Decision(Base):
-    """Stage 2 output — an LLM-extracted decision record (SPEC.md §5, §6).
+    """LLM-extracted decision record (SPEC.md §5, §6).
 
-    Only the fields Stage 2 can actually populate; `supersedes` /
-    `superseded_by` (Stage 3) and `reconciliation` (Phase 5) are added in a
-    later migration once those stages exist. `status` is always "active"
-    until Stage 3 introduces supersession/reversal transitions.
+    `statement_embedding`, `supersedes`, `superseded_by` are Stage 3
+    (SPEC.md §5): semantic retrieval over `statement_embedding` finds
+    existing active decisions a new one might relate to; an LLM classifies
+    the relationship (unrelated/amendment/reversal/duplicate) and, for
+    reversal/duplicate, the chain is updated here. `reconciliation` (Phase 5)
+    is still deferred — added in a later migration once that stage exists.
     """
 
     __tablename__ = "decisions"
@@ -204,6 +206,7 @@ class Decision(Base):
         UUID(as_uuid=True), ForeignKey("candidates.id"), nullable=False
     )
     statement: Mapped[str] = mapped_column(Text, nullable=False)
+    statement_embedding: Mapped[list | None] = mapped_column(EmbeddingColumn, nullable=True)
     type: Mapped[str] = mapped_column(String(16), nullable=False)
     scope: Mapped[str | None] = mapped_column(String(255), nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -215,6 +218,12 @@ class Decision(Base):
     authority_tier: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    supersedes: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("decisions.id"), nullable=True
+    )
+    superseded_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("decisions.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     candidate: Mapped["Candidate"] = relationship()

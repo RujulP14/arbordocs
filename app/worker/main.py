@@ -5,10 +5,11 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.models import Candidate, DiscussionUnit, utcnow
+from app.db.models import Candidate, Decision, DiscussionUnit, utcnow
 from app.db.session import async_session
 from app.pipeline.candidate_filter import score_unit
 from app.pipeline.extraction import extract_decision
+from app.pipeline.supersession import classify_relationship
 
 logger = logging.getLogger("arbordocs.worker")
 
@@ -66,8 +67,9 @@ async def run_candidate_filter(units: list[DiscussionUnit]) -> list[Candidate]:
     return candidates
 
 
-async def run_extraction(candidates: list[Candidate]) -> None:
+async def run_extraction(candidates: list[Candidate]) -> list[Decision]:
     """Stage 2 (SPEC.md §5) over each newly-flagged candidate."""
+    decisions = []
     async with async_session() as db:
         for candidate in candidates:
             fresh_candidate = await db.get(Candidate, candidate.id)
@@ -81,10 +83,33 @@ async def run_extraction(candidates: list[Candidate]) -> None:
                     decision.type,
                     decision.confidence,
                 )
+                await db.refresh(decision)
+                decisions.append(decision)
             else:
                 logger.debug(
                     "candidate gated out (not a resolved decision): candidate=%s", fresh_candidate.id
                 )
+    return decisions
+
+
+async def run_supersession(decisions: list[Decision]) -> None:
+    """Stage 3 (SPEC.md §5) over each newly-extracted decision."""
+    async with async_session() as db:
+        for decision in decisions:
+            fresh_decision = await db.get(Decision, decision.id)
+            classifications = await classify_relationship(db, fresh_decision)
+            await db.commit()
+            for c in classifications:
+                logger.info(
+                    "decision %s vs %s: relationship=%s similarity=%.2f confidence=%.2f",
+                    fresh_decision.id,
+                    c["existing_decision_id"],
+                    c["relationship"],
+                    c["similarity"],
+                    c["confidence"],
+                )
+            if not classifications:
+                logger.debug("no similar active decisions found: decision=%s", fresh_decision.id)
 
 
 async def poll_once() -> None:
@@ -93,7 +118,9 @@ async def poll_once() -> None:
         logger.info("closed %d discussion unit(s)", len(closed))
         candidates = await run_candidate_filter(closed)
         if candidates:
-            await run_extraction(candidates)
+            decisions = await run_extraction(candidates)
+            if decisions:
+                await run_supersession(decisions)
 
 
 async def run_forever() -> None:

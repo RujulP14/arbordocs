@@ -47,34 +47,52 @@ is checked off.
       accuracy can drop into the ~65-70% range on short, low-content,
       no-reply cross-topic messages — a known Stage 0 limitation, not yet
       covered by a harness case.
-- [ ] **Phase 4 — Stage 2 + Stage 3.**
+- [x] **Phase 4 — Stage 2 + Stage 3.**
       LLM extraction into the schema; supersession tracking. Re-run eval, add
       the supersession-classification metric.
-      **Stage 2 done, Stage 3 not started.** `app/pipeline/extraction.py`
-      does the gate+extract call (SPEC.md §5) into a new `decisions` table
-      (migration `0003_decision_extraction.py`), wired into the `worker`'s
-      poll loop right after Stage 1 (`run_extraction` in
-      `app/worker/main.py`). Supports two interchangeable providers
-      (`extract_decision(..., provider=...)`) — compared side-by-side via
-      `eval/compare_providers.py`, first against 5 curated threads and then
-      the full 24-thread labeled dataset (`--full`). **Groq
-      (`openai/gpt-oss-120b`)** is the default: 22/24 correct gate decisions
-      on the full dataset, misses being 2 false positives on jokes with
-      decision-like phrasing (the same failure mode Stage 2 exists to fix —
-      a stricter gate prompt could plausibly tighten this further).
-      **Ollama (`qwen2.5:7b`, fully local, no API key)** also reached 22/24,
-      but with the opposite failure mode — 2 false negatives, missing real
-      decisions (one ✅-confirmed, one an explicit "the policy is X")
-      — plus weaker extraction quality throughout: occasional empty
-      `statement`, citation-only `rationale` (e.g. just `['thread-id-1']`
-      instead of prose), uncalibrated `confidence` (flips between 0 and 1
-      with no correlation to certainty), and some `type` mislabeling.
-      Ollama remains available as a no-cost fallback via `provider="ollama"`.
-      Gemini was scoped and implemented first but dropped entirely after
-      never being verified end-to-end (no working API key was available)
-      and after Groq/Ollama both proved out — no Gemini code remains.
-      Stage 3 (supersession tracking) is unbuilt — no
-      `supersedes`/`superseded_by` columns exist yet on `decisions`.
+      **Stage 2:** `app/pipeline/extraction.py` does the gate+extract call
+      (SPEC.md §5) into a new `decisions` table (migration
+      `0003_decision_extraction.py`), wired into the `worker`'s poll loop
+      right after Stage 1 (`run_extraction` in `app/worker/main.py`).
+      Supports two interchangeable providers (`extract_decision(...,
+      provider=...)`) — compared side-by-side via `eval/compare_providers.py`,
+      first against 5 curated threads and then the full 24-thread labeled
+      dataset (`--full`). **Groq (`openai/gpt-oss-120b`)** is the default:
+      23/24 correct gate decisions on the full dataset after strengthening
+      the prompt's decision definition and adding few-shot examples (up from
+      22/24); the one remaining miss is a genuinely ambiguous case (decisive
+      "let's go with X" phrasing on a non-technical/lunch topic). **Ollama
+      (`qwen2.5:7b`, fully local, no API key)** reached 22/24 with the
+      opposite failure mode — false negatives on real decisions plus weaker
+      extraction quality (occasional empty `statement`, citation-only
+      `rationale`, uncalibrated `confidence`) — and remains available as a
+      no-cost fallback via `provider="ollama"`. Gemini was scoped and
+      implemented first but dropped entirely after never being verified
+      end-to-end and after Groq/Ollama both proved out — no Gemini code
+      remains. Hardened against prompt injection from Discord message
+      content: untrusted-data framing in the system prompt, delimited
+      transcript with sanitization against smuggled closing tags, and
+      `decider` grounded to the discussion unit's real participants (same
+      anti-hallucination pattern as `message_ids`).
+      **Stage 3:** `app/pipeline/supersession.py` retrieves existing active
+      decisions in the same project above `settings.
+      supersession_similarity_threshold` (cosine similarity over a new
+      `statement_embedding` column, computed in Python against
+      `app/pipeline/embeddings.py:cosine_similarity` — same pattern as
+      Stage 0/1, since pgvector's DB-side ops don't work against the
+      in-memory sqlite used by tests), then LLM-classifies the relationship
+      to each (`unrelated`/`amendment`/`reversal`/`duplicate`) and, for
+      `reversal`/`duplicate`, marks the old decision `status="superseded"`
+      and links `supersedes`/`superseded_by` both directions (migration
+      `0004_supersession_tracking.py`). Wired into the worker right after
+      Stage 2 (`run_supersession`). Verified end-to-end against the real
+      Groq API: a decision reversing an earlier one *without naming it*
+      ("drop offset pagination, cursor-based is cleaner") was correctly
+      classified `reversal` (confidence 0.99) and the chain linked
+      correctly both directions; a genuinely unrelated decision (an oncall
+      rotation policy) correctly scored below the similarity threshold and
+      never reached the LLM at all — the retrieval-then-classify
+      cost-control design working as intended.
 - [ ] **Phase 5 — GitHub ingestion + reconciliation (tier-b first) + human
       review UI + decision store + portal + audit ledger.**
       This is the shippable v1 checkpoint.

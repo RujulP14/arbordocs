@@ -5,6 +5,52 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Phase 4, Stage 3 implementation)
+- `Decision` gains `statement_embedding`, `supersedes`, `superseded_by`
+  columns (migration `0004_supersession_tracking`) — `status` is no longer
+  hardcoded to `"active"`; Stage 3 can now transition it to `"superseded"`.
+- `app/pipeline/supersession.py` — Stage 3: for each newly-extracted
+  decision, `find_similar_active_decisions` retrieves existing active
+  decisions in the same project above `settings.
+  supersession_similarity_threshold` (cosine similarity over
+  `statement_embedding`, scored in Python — same pattern as Stage 0/1,
+  since pgvector's DB-side ops don't work against the in-memory sqlite used
+  by tests). `classify_relationship` then LLM-classifies the relationship
+  to each retrieved candidate (`unrelated`/`amendment`/`reversal`/
+  `duplicate`) and, for `reversal`/`duplicate`, marks the old decision
+  `status="superseded"` and links `supersedes`/`superseded_by` both
+  directions. Same untrusted-data prompt framing as Stage 2 (both
+  decisions' statements ultimately trace back to Discord chat).
+- `app/pipeline/extraction.py` — `extract_decision` now computes
+  `statement_embedding` via the existing `get_embedder()` at extraction
+  time, so it's ready for Stage 3 retrieval without re-embedding later.
+- `app/worker/main.py` — `run_supersession` runs Stage 3 on every decision
+  Stage 2 extracts, called right after `run_extraction` in `poll_once`.
+- Verified end-to-end against the real Groq API: a decision reversing an
+  earlier one *without naming it* ("drop offset pagination, cursor-based is
+  cleaner" vs. the original "use offset-based pagination") was correctly
+  classified `reversal` (confidence 0.99), with the old decision marked
+  superseded and both `supersedes`/`superseded_by` links set correctly. A
+  genuinely unrelated decision (an oncall rotation policy) scored below the
+  similarity threshold and never reached the LLM at all, confirming the
+  retrieve-then-classify cost-control design works as intended.
+
+### Changed (Phase 4, Stage 2 prompt hardening)
+- Strengthened `SYSTEM_PROMPT`'s definition of a "resolved decision" (covers
+  plain agreement without ceremonial phrasing) and added 5 few-shot examples
+  (written fresh, not from `eval/dataset.py`, to avoid contaminating the
+  eval benchmark). Verified via `eval/compare_providers.py --full`: Groq's
+  full-dataset gate accuracy improved from 22/24 to 23/24; the one
+  remaining miss is a genuinely ambiguous case (decisive "let's go with X"
+  phrasing on a non-technical/lunch topic).
+- Hardened against prompt injection from Discord message content (fully
+  attacker-controlled): `SYSTEM_PROMPT` explicitly frames the transcript as
+  untrusted data, never instructions; the transcript is now wrapped in
+  `<discord_transcript>` delimiters with sanitization stripping any
+  attacker-smuggled closing tag; `decider` is now enum-constrained to the
+  discussion unit's real participant `author_id`s (same anti-hallucination
+  grounding pattern already used for `message_ids`).
+
 ### Added (Phase 4, Stage 2 implementation)
 - New `Decision` model + Alembic migration `0003_decision_extraction`: the
   Stage 2 output table (`statement`, `type`, `scope`, `rationale`, `decider`,
