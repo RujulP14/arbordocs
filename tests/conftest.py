@@ -1,3 +1,6 @@
+import json
+from types import SimpleNamespace
+
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -45,3 +48,32 @@ def fake_embedder():
             "unrelated": [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         }
     )
+
+
+class FakeGroqClient:
+    """Deterministic fake Groq client for tests — no real API calls.
+
+    `responses` is a list of dicts matching the Stage 2 extraction schema
+    (see app/pipeline/extraction.py:build_extraction_schema); each call to
+    `.chat.completions.create(...)` pops the next one and returns it as a
+    canned structured-output response.
+    """
+
+    def __init__(self, responses: list[dict]) -> None:
+        self._responses = list(responses)
+        self.last_call_kwargs: dict | None = None
+        self.chat = SimpleNamespace(
+            completions=SimpleNamespace(create=self._create),
+        )
+
+    def _create(self, **kwargs):
+        self.last_call_kwargs = kwargs
+        result = self._responses.pop(0)
+        message = SimpleNamespace(content=json.dumps(result))
+        choice = SimpleNamespace(message=message)
+        return SimpleNamespace(choices=[choice])
+
+
+@pytest.fixture
+def fake_groq_client():
+    return lambda responses: FakeGroqClient(responses)

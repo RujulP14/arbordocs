@@ -182,3 +182,39 @@ class Candidate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     discussion_unit: Mapped["DiscussionUnit"] = relationship(back_populates="candidates")
+
+
+class Decision(Base):
+    """Stage 2 output — an LLM-extracted decision record (SPEC.md §5, §6).
+
+    Only the fields Stage 2 can actually populate; `supersedes` /
+    `superseded_by` (Stage 3) and `reconciliation` (Phase 5) are added in a
+    later migration once those stages exist. `status` is always "active"
+    until Stage 3 introduces supersession/reversal transitions.
+    """
+
+    __tablename__ = "decisions"
+    __table_args__ = (Index("ix_decisions_project_status", "project_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidates.id"), nullable=False
+    )
+    statement: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    scope: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    participants: Mapped[list] = mapped_column(JsonColumn, default=list, nullable=False)
+    channel_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    message_ids: Mapped[list] = mapped_column(JsonColumn, default=list, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    authority_tier: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    candidate: Mapped["Candidate"] = relationship()

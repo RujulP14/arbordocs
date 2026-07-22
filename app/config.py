@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     discord_oauth_client_id: str = ""
     discord_oauth_client_secret: str = ""
 
-    anthropic_api_key: str = ""
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-120b"
+    ollama_model: str = "qwen2.5:7b"
 
     # Phase 2 — discussion reconstruction (Stage 0) + candidate filter (Stage 1).
     # Env-overridable so Phase 3 ablations (recall vs. threshold) don't need code changes.

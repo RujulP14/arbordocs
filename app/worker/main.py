@@ -5,9 +5,10 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.models import DiscussionUnit, utcnow
+from app.db.models import Candidate, DiscussionUnit, utcnow
 from app.db.session import async_session
 from app.pipeline.candidate_filter import score_unit
+from app.pipeline.extraction import extract_decision
 
 logger = logging.getLogger("arbordocs.worker")
 
@@ -41,8 +42,9 @@ async def close_due_units() -> list[DiscussionUnit]:
         return closed
 
 
-async def run_candidate_filter(units: list[DiscussionUnit]) -> None:
+async def run_candidate_filter(units: list[DiscussionUnit]) -> list[Candidate]:
     """Stage 1 over each newly-closed unit (ARCHITECTURE.md step 4)."""
+    candidates = []
     async with async_session() as db:
         for unit in units:
             fresh_unit = await db.get(DiscussionUnit, unit.id)
@@ -57,15 +59,41 @@ async def run_candidate_filter(units: list[DiscussionUnit]) -> None:
                     candidate.embedding_score,
                     candidate.reaction_signal,
                 )
+                await db.refresh(candidate)
+                candidates.append(candidate)
             else:
                 logger.debug("no candidate signal: discussion_unit=%s", fresh_unit.id)
+    return candidates
+
+
+async def run_extraction(candidates: list[Candidate]) -> None:
+    """Stage 2 (SPEC.md §5) over each newly-flagged candidate."""
+    async with async_session() as db:
+        for candidate in candidates:
+            fresh_candidate = await db.get(Candidate, candidate.id)
+            decision = await extract_decision(db, fresh_candidate)
+            await db.commit()
+            if decision is not None:
+                logger.info(
+                    "decision extracted: candidate=%s statement=%r type=%s confidence=%.2f",
+                    fresh_candidate.id,
+                    decision.statement,
+                    decision.type,
+                    decision.confidence,
+                )
+            else:
+                logger.debug(
+                    "candidate gated out (not a resolved decision): candidate=%s", fresh_candidate.id
+                )
 
 
 async def poll_once() -> None:
     closed = await close_due_units()
     if closed:
         logger.info("closed %d discussion unit(s)", len(closed))
-        await run_candidate_filter(closed)
+        candidates = await run_candidate_filter(closed)
+        if candidates:
+            await run_extraction(candidates)
 
 
 async def run_forever() -> None:
