@@ -70,8 +70,8 @@ SECRET_ARGS+=("BASE_URL=https://$APP_NAME.fly.dev")
 echo "==> Deploying (release_command runs 'alembic upgrade head' automatically)"
 "$FLY" deploy --app "$APP_NAME"
 
-echo "==> Scaling process groups (web: 1 machine, bot: 1 machine, no autoscale-to-zero)"
-"$FLY" scale count web=1 bot=1 --app "$APP_NAME" --yes
+echo "==> Scaling process groups (web/bot/worker: 1 machine each, no autoscale-to-zero)"
+"$FLY" scale count web=1 bot=1 worker=1 --app "$APP_NAME" --yes
 
 echo "==> Done. Web app: https://$APP_NAME.fly.dev"
 echo "==> Remember to update your GitHub App's callback URL and Discord's redirect URI to point at that domain."
