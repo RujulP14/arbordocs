@@ -294,6 +294,7 @@ async def extract_decision(
         message_ids=result["message_ids"],
         timestamp=messages[-1].created_at,
         authority_tier=authority_tier,
+        status="proposed",
         confidence=result["confidence"],
     )
     db.add(decision)

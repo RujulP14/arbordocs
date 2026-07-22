@@ -75,6 +75,20 @@ async def test_embedding_similarity_to_exemplar_flags_candidate(db_session, fake
     assert candidate.embedding_score > 0
 
 
+async def test_keyword_match_with_inserted_word_still_flags(db_session, fake_embedder):
+    """Natural paraphrasing ("let's just go with" vs. the exact "let's go
+    with") must not silently defeat the keyword signal — real conversations
+    don't use exact phrasing, and Stage 1 is supposed to be high-recall."""
+    project, unit = await _make_project_and_unit(db_session)
+    db_session.add(_message(project.id, unit.id, content="fair, let's just go with REST then"))
+    await db_session.commit()
+
+    candidate = await score_unit(db_session, unit, embedder=fake_embedder)
+
+    assert candidate is not None
+    assert "let's just go with" in candidate.matched_keywords
+
+
 async def test_no_signal_returns_none(db_session, fake_embedder):
     project, unit = await _make_project_and_unit(db_session)
     db_session.add(_message(project.id, unit.id, content="just chatting about the weather"))

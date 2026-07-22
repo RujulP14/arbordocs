@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Review decisions — {{ project.name }}{% endblock %}
+{% block content %}
+  <a href="/projects/{{ project.id }}" class="back-link">← {{ project.name }}</a>
+  <h1>Review decisions</h1>
+  <p style="color: var(--text-muted); margin-top: -0.25rem;">
+    Decisions extracted from Discord that are waiting for your approval before they go live.
+  </p>
+
+  <ul class="decision-list">
+    {% for decision in decisions %}
+      <li>
+        <a class="decision-row" href="/projects/{{ project.id }}/decisions/{{ decision.id }}">
+          <span class="statement">{{ decision.statement }}</span>
+          <span class="badge">{{ decision.type }}</span>
+          <span class="badge badge-confidence">confidence {{ "%.0f"|format(decision.confidence * 100) }}%</span>
+        </a>
+      </li>
+    {% else %}
+      <li class="empty">No decisions awaiting review.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

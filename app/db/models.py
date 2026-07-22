@@ -198,6 +198,13 @@ class Decision(Base):
     docs for a human to confirm — `state` is always `"unverified"` in v1
     since tier-a (concrete contradiction detection, the only path to
     `"consistent"`/`"contradiction"`) is deferred to Phase 6.
+
+    `status` (ARCHITECTURE.md step 9): Stage 2 extraction always writes
+    `"proposed"`; a human review action in `app/web/decisions.py` flips it to
+    `"active"` (approve) or `"rejected"` (reject) — only `"active"` decisions
+    are visible to Stage 3's supersession search or any future portal.
+    `"superseded"` is set by Stage 3 on an existing decision when a new one
+    reverses/duplicates it.
     """
 
     __tablename__ = "decisions"
@@ -221,7 +228,7 @@ class Decision(Base):
     message_ids: Mapped[list] = mapped_column(JsonColumn, default=list, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     authority_tier: Mapped[str] = mapped_column(String(16), nullable=False)
-    status: Mapped[str] = mapped_column(String(16), default="active", nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="proposed", nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     supersedes: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("decisions.id"), nullable=True

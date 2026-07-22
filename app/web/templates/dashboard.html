@@ -9,11 +9,13 @@
     <button type="submit">Create project</button>
   </form>
 
-  <ul class="project-list">
-    {% for project in projects %}
-      <li><a href="/projects/{{ project.id }}">{{ project.name }}</a></li>
-    {% else %}
-      <li class="empty">No projects yet — create one above.</li>
-    {% endfor %}
-  </ul>
+  <div class="card">
+    <ul class="project-list">
+      {% for project in projects %}
+        <li><a href="/projects/{{ project.id }}">{{ project.name }}</a></li>
+      {% else %}
+        <li class="empty">No projects yet — create one above.</li>
+      {% endfor %}
+    </ul>
+  </div>
 {% endblock %}

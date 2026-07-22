@@ -148,8 +148,56 @@ is checked off.
       `tests/test_reconciliation.py` cover threshold filtering, project
       scoping, the three no-op edge cases (no scope, no embedding, no
       synced repo documents), correct code/doc splitting with anchors, and
-      the max-related cap. Human review UI (surfacing these flags) is the
-      next Phase 5 piece.
+      the max-related cap.
+      **Piece 3, human review UI, done:** `app/web/decisions.py` — a review
+      queue (`GET /projects/{id}/decisions`, listing `status="proposed"`
+      decisions oldest-first) and detail page (`GET /projects/{id}/
+      decisions/{id}`, showing full statement/scope/rationale/decider/
+      participants, real source-message transcript resolved from
+      `Message.discord_message_id`, reconciliation flags, and supersession
+      links) with approve/reject/edit POST actions
+      (`/decisions/{id}/approve|reject|edit`). Per ARCHITECTURE.md step 9
+      ("only approval flips status to active"), Stage 2 extraction
+      (`app/pipeline/extraction.py`) now writes `status="proposed"` instead
+      of defaulting straight to `"active"` — a real behavior change, not
+      just a UI addition. Stage 3/reconciliation are unaffected (they only
+      gate on `existing.status == "active"` for comparison targets, never
+      on the new decision's own status). Templates follow the existing
+      Jinja2+HTMX server-rendered convention with a card-based, two-column
+      detail layout. 10 unit tests in `tests/test_web_decisions.py` (via
+      `httpx.ASGITransport` + `app.dependency_overrides`) cover queue
+      filtering, approve/reject/edit, reconciliation display, and
+      source-message rendering (including the deleted/missing-message
+      placeholder). Verified end-to-end against the real local Postgres
+      DB: approved and reviewed real decisions extracted from an actual
+      Discord conversation (see the Stage 1 fix below) through the live
+      web UI.
+      **Stage 1 recall fix (real-world testing):** manual Discord testing
+      surfaced two Stage 1 (`app/pipeline/candidate_filter.py`) defects
+      causing genuinely-decided conversations to produce zero signal: (1)
+      `KEYWORD_PATTERNS` was brittle to natural paraphrasing (e.g. "let's
+      **just** go with X" missed the exact-phrase list) and missing entire
+      phrasing families (switching-to/moving-to, decided/agreed/settled,
+      etc.) — expanded from 10 to ~55 patterns across 7 categories; (2)
+      `EXEMPLAR_DECISIONS` (5 entries) had no coverage for general
+      technology/framework/protocol-choice decisions — expanded to 15,
+      adding that shape class. Separately, `app/ingestion/discord/bot.py`'s
+      `on_reaction_add` set `signal_close_requested` on the discussion unit
+      but never wrote the ✅ into the message's `reactions` column, so a
+      live reaction closed the unit but was invisible to Stage 1's
+      `reaction_signal` check — fixed by appending the emoji to
+      `message_row.reactions` in the same handler. Verified via
+      `uv run python -m eval.harness`: F1 held at 0.85 (precision=0.73,
+      recall=1.00) before and after — no regression. Verified against real
+      Discord conversations: a "should we use REST or GraphQL... let's just
+      go with REST" conversation, previously silently dropped (0 candidate
+      signal), now correctly flags via the keyword fix alone
+      (`matched_keywords=["let's just go with"]`) and flows all the way
+      through Stage 2→3→reconciliation→review UI as a real `proposed`
+      decision. A follow-up Stage 0 (discussion reconstruction) grouping
+      gap was found during this same testing — tracked as a separate
+      GitHub issue since it's an independent, pre-existing limitation (see
+      issue link), not part of this piece.
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**

@@ -1,23 +1,29 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — ArborDocs{% endblock %}
 {% block content %}
+  <a href="/projects" class="back-link">← Projects</a>
   <h1>{{ project.name }}</h1>
-  {% if project.description %}<p>{{ project.description }}</p>{% endif %}
+  {% if project.description %}<p style="color: var(--text-muted); margin-top: -0.25rem;">{{ project.description }}</p>{% endif %}
 
-  <section>
+  <div class="card">
+    <h2>Decisions</h2>
+    <a href="/projects/{{ project.id }}/decisions" class="button">Review decisions</a>
+  </div>
+
+  <div class="card">
     <h2>GitHub</h2>
     {% if project.github_installation %}
       <p>Connected: <code>{{ project.github_installation.repo_full_name }}</code></p>
-      <a href="/integrations/github/connect/{{ project.id }}">Change repo</a>
+      <a href="/integrations/github/connect/{{ project.id }}" class="button button-secondary">Change repo</a>
     {% else %}
       <a href="/integrations/github/connect/{{ project.id }}" class="button">Connect GitHub</a>
     {% endif %}
-  </section>
+  </div>
 
-  <section>
+  <div class="card">
     <h2>Discord channels</h2>
     {% if project.channels %}
-      <ul>
+      <ul class="channel-picker">
         {% for ch in project.channels %}
           <li>
             #{{ ch.channel_name or ch.channel_id }}
@@ -27,5 +33,5 @@
       </ul>
     {% endif %}
     <a href="/integrations/discord/connect/{{ project.id }}" class="button">Add to Discord</a>
-  </section>
+  </div>
 {% endblock %}

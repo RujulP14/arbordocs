@@ -5,6 +5,66 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed (Stage 1 recall — real-world testing)
+- `app/pipeline/candidate_filter.py` — `KEYWORD_PATTERNS` expanded from 10
+  brittle exact phrases to ~55 patterns organized into 7 categories
+  (let's-go-with variants, decided/agreed/settled, going-with,
+  switching/moving-to, explicit decision framing, use/adopt/keep/drop,
+  temporal framing). Root cause: a real Discord test ("let's **just** go
+  with REST") was silently dropped because the keyword list only matched
+  the exact phrase "let's go with", not natural paraphrasing.
+  `EXEMPLAR_DECISIONS` expanded from 5 to 15, adding technology/framework/
+  protocol-choice decision shapes that had zero coverage before (e.g.
+  "We decided to go with REST instead of GraphQL").
+- `app/ingestion/discord/bot.py` — `on_reaction_add` now appends the ✅
+  emoji to `message_row.reactions` (previously only
+  `signal_close_requested` was set on the unit, so a live reaction closed
+  the discussion but stayed invisible to Stage 1's `reaction_signal`
+  check — every live ✅ was silently ignored by candidate scoring).
+- Verified no regression via `uv run python -m eval.harness`: F1 held at
+  0.85 (precision=0.73, recall=1.00) before and after both changes.
+  Verified against a real Discord conversation ("should we use REST or
+  GraphQL... let's just go with REST") that previously produced zero
+  Stage 1 signal — now correctly flags (`matched_keywords=["let's just go
+  with"]`) and flows through Stage 2→3→reconciliation→review UI as a real
+  decision.
+- A related Stage 0 (discussion reconstruction) grouping gap was found
+  during this same testing and filed as a separate GitHub issue — a
+  non-reply message scoring just under `reconstruction_similarity_threshold`
+  opened a new discussion unit instead of joining the parent conversation.
+  Independent, pre-existing limitation; not fixed as part of this change.
+
+### Added (Phase 5, piece 3 — human review UI)
+- `app/web/decisions.py` — review queue (`GET /projects/{id}/decisions`,
+  `status="proposed"` decisions oldest-first) and detail page (`GET
+  /projects/{id}/decisions/{id}`) showing the full decision record, real
+  source-message transcript (resolved from `Message.discord_message_id`,
+  with a graceful placeholder for deleted/missing messages), reconciliation
+  flags, and supersession links. `POST /decisions/{id}/approve|reject|edit`
+  actions.
+- Per ARCHITECTURE.md step 9 ("only approval flips status to active"):
+  `app/pipeline/extraction.py`'s `Decision(...)` construction now writes
+  `status="proposed"` instead of the previous default of `"active"` —
+  `app/db/models.py`'s column default changed to match. A human must now
+  approve (`"active"`) or reject (`"rejected"`, new terminal status) before
+  a decision is visible to any future portal. Stage 3/reconciliation are
+  unaffected (both only gate on `existing.status == "active"` for
+  comparison targets, never the new decision's own status).
+- New templates (`decisions_queue.html`, `decision_detail.html`) plus a
+  visual overhaul of `app/web/static/style.css` and the existing templates
+  (card-based sections, color-coded status/type badges, two-column sticky-
+  sidebar detail layout) — same Jinja2 + HTMX server-rendered approach, no
+  new frontend build step.
+- `tests/test_web_decisions.py` — 10 tests via `httpx.ASGITransport` +
+  `app.dependency_overrides` (the standard FastAPI test pattern, first use
+  in this codebase): queue filtering by status, approve/reject/edit,
+  reconciliation display (present and absent), and source-message
+  rendering including the missing-message placeholder.
+- Verified end-to-end against the real local Postgres DB: approved,
+  rejected, and edited real decisions (including ones extracted from an
+  actual Discord conversation per the Stage 1 fix above) through the live
+  web UI, confirming persisted status transitions.
+
 ### Added (Phase 5, piece 2 — reconciliation engine, tier-b)
 - `Decision` gains a `reconciliation` JSON column (migration
   `0006_decision_reconciliation`), matching SPEC.md §6's exact shape

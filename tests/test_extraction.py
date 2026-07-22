@@ -133,6 +133,7 @@ async def test_gate_true_creates_decision_with_correct_fields(db_session, fake_g
     assert decision.message_ids == ["msg-1", "msg-2"]
     assert decision.candidate_id == candidate.id
     assert decision.project_id == project.id
+    assert decision.status == "proposed"
 
 
 async def test_authority_tier_copied_from_channel(db_session, fake_groq_client):
