@@ -81,7 +81,7 @@ async def decision_detail(
         {
             "id": mid,
             "message": messages_by_id.get(mid),
-            "url": await _resolve_message_url(db, decision.channel_id, mid),
+            "has_link": await _resolve_message_url(db, decision.channel_id, mid) is not None,
         }
         for mid in decision.message_ids
     ]
@@ -101,6 +101,28 @@ async def decision_detail(
             "superseded_by": superseded_by,
         },
     )
+
+
+@router.get("/decisions/{decision_id}/messages/{message_id}/open")
+async def open_source_message(
+    decision_id: uuid.UUID,
+    message_id: str,
+    user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """Same-origin redirect to a message's Discord permalink — the template
+    never embeds the external discord.com URL directly in an `href`, only
+    this relative, server-validated path (avoids a var-in-href XSS finding
+    on a value that's always server-built, never user-controlled).
+    """
+    decision = await db.get(Decision, decision_id)
+    if decision is None or message_id not in decision.message_ids:
+        raise HTTPException(status_code=404)
+
+    url = await _resolve_message_url(db, decision.channel_id, message_id)
+    if url is None:
+        raise HTTPException(status_code=404)
+    return RedirectResponse(url)
 
 
 @router.post("/decisions/{decision_id}/approve")

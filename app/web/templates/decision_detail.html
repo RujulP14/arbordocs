@@ -33,13 +33,13 @@
                 <div class="transcript-meta">
                   <span class="transcript-author">{{ link.message.author_name or link.message.author_id }}</span>
                   <span class="transcript-time">{{ link.message.created_at.strftime("%b %d, %Y %H:%M") }}</span>
-                  {% if link.url %}<a href="{{ link.url }}" target="_blank" class="transcript-link">↗</a>{% endif %}
+                  {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="transcript-link">↗</a>{% endif %}
                 </div>
                 <div class="transcript-content">{{ link.message.content }}</div>
               {% else %}
                 <div class="transcript-meta">
                   <span class="transcript-author">Unknown message</span>
-                  {% if link.url %}<a href="{{ link.url }}" target="_blank" class="transcript-link">↗</a>{% endif %}
+                  {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="transcript-link">↗</a>{% endif %}
                 </div>
                 <div class="transcript-content empty">Message {{ link.id }} was not found (may have been deleted).</div>
               {% endif %}

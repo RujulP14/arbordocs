@@ -191,7 +191,43 @@ async def test_message_link_resolved_when_channel_attached(client):
     resp = await ac.get(f"/projects/{project.id}/decisions/{decision.id}")
 
     assert resp.status_code == 200
-    assert "https://discord.com/channels/guild-1/chan-1/msg-1" in resp.text
+    assert f"/decisions/{decision.id}/messages/msg-1/open" in resp.text
+    assert "discord.com" not in resp.text
+
+
+async def test_open_source_message_redirects_to_discord_permalink(client):
+    ac, admin, db_session = client
+    project = await _make_project(db_session, admin)
+
+    guild = DiscordGuild(guild_id="guild-1", guild_name="Test Guild")
+    db_session.add(guild)
+    await db_session.flush()
+    channel = ProjectChannel(
+        project_id=project.id, discord_guild_id=guild.id, channel_id="chan-1", channel_name="eng"
+    )
+    db_session.add(channel)
+    await db_session.flush()
+
+    decision = _decision(project.id, channel_id="chan-1", message_ids=["msg-1"])
+    db_session.add(decision)
+    await db_session.commit()
+
+    resp = await ac.get(f"/decisions/{decision.id}/messages/msg-1/open", follow_redirects=False)
+
+    assert resp.status_code in (302, 307)
+    assert resp.headers["location"] == "https://discord.com/channels/guild-1/chan-1/msg-1"
+
+
+async def test_open_source_message_404s_for_unknown_message_id(client):
+    ac, admin, db_session = client
+    project = await _make_project(db_session, admin)
+    decision = _decision(project.id, channel_id="chan-1", message_ids=["msg-1"])
+    db_session.add(decision)
+    await db_session.commit()
+
+    resp = await ac.get(f"/decisions/{decision.id}/messages/not-in-decision/open", follow_redirects=False)
+
+    assert resp.status_code == 404
 
 
 async def test_detail_renders_real_source_message_content(client):
