@@ -66,6 +66,7 @@ class GitHubInstallation(Base):
     installation_id: Mapped[str] = mapped_column(String(64), nullable=False)
     repo_full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="github_installation")
 
@@ -227,3 +228,33 @@ class Decision(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     candidate: Mapped["Candidate"] = relationship()
+
+
+class RepoDocument(Base):
+    """A GitHub repo's ground-truth index — doc sections and code symbols
+    (SPEC.md §4), queryable by the reconciliation engine (Phase 5).
+
+    Unified table rather than two separate ones: both kinds are
+    conceptually "a chunk of repo content with an embedding," and
+    reconciliation queries "find related content for this decision" once,
+    not once per content type. `kind` distinguishes them; `symbol_name` and
+    `line_start`/`line_end` only apply to `kind="code_symbol"`. Resync
+    replaces a project's rows wholesale rather than diffing incrementally.
+    """
+
+    __tablename__ = "repo_documents"
+    __table_args__ = (Index("ix_repo_documents_project_kind", "project_id", "kind"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    path: Mapped[str] = mapped_column(String(512), nullable=False)
+    symbol_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    anchor: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list | None] = mapped_column(EmbeddingColumn, nullable=True)
+    line_start: Mapped[int | None] = mapped_column(nullable=True)
+    line_end: Mapped[int | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

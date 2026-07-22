@@ -96,6 +96,33 @@ is checked off.
 - [ ] **Phase 5 — GitHub ingestion + reconciliation (tier-b first) + human
       review UI + decision store + portal + audit ledger.**
       This is the shippable v1 checkpoint.
+      **Piece 1, GitHub content ingestion, done:** `app/pipeline/
+      github_index.py` parses repo docs into sections (`parse_doc_sections`,
+      splitting markdown by heading, GitHub-style anchor slugs) and code into
+      symbols (`parse_code_symbols`, stdlib `ast` — top-level functions,
+      classes, and class methods with dotted names like `Bar.method_a`) into
+      a new unified `RepoDocument` table (migration
+      `0005_github_content_index`; one `kind` column distinguishes
+      `doc_section`/`code_symbol` rather than two separate tables).
+      `GitHubAppClient` gained `get_repo_tree`/`get_file_content` (Git Trees
+      + Contents APIs). `sync_repo_index` orchestrates: list the installed
+      repo's tree, fetch markdown/`.py` files under configurable size/count
+      caps (`github_sync_max_file_size_bytes`, `github_sync_max_files`),
+      parse, embed each chunk (same `get_embedder()` singleton as Stage 0/1),
+      and replace the project's `RepoDocument` rows wholesale on resync (no
+      incremental diffing in v1). Wired into the existing `worker` poll loop
+      (`run_github_sync`, gated by a per-installation `last_synced_at`
+      timestamp vs. `github_sync_interval_seconds`, default 3600s) rather
+      than a separate process. Verified end-to-end against the real
+      ArborDocs GitHub repo via a live GitHub App installation (not just
+      unit tests): 236 `RepoDocument` rows created (70 doc sections, 166
+      code symbols) across every `.md`/`.py` file in the repo, with correct
+      anchors spot-checked against known content, e.g.
+      `docs/SPEC.md#5-the-decision-extractor-the-make-or-break-component`
+      and `app/pipeline/extraction.py#extract_decision` (lines 238-300).
+      8 unit tests in `tests/test_github_index.py` cover parsing, size-cap
+      filtering, and resync-replaces-not-duplicates behavior. Reconciliation
+      engine (querying this index) is the next Phase 5 piece.
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**

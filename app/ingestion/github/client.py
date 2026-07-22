@@ -90,5 +90,37 @@ class GitHubAppClient:
             resp.raise_for_status()
             return resp.json()["repositories"]
 
+    async def get_repo_tree(self, installation_id: str, repo_full_name: str) -> list[dict]:
+        """Recursive git tree for the repo's default branch — one call gets
+        every file path in the repo (path, type, sha), no pagination needed
+        for repos under GitHub's tree-size cap (SPEC.md §4's "lightweight
+        per-project index" scope).
+        """
+        token = await self.get_installation_token(installation_id)
+        headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+        async with httpx.AsyncClient() as client:
+            repo_resp = await client.get(f"{GITHUB_API}/repos/{repo_full_name}", headers=headers)
+            repo_resp.raise_for_status()
+            default_branch = repo_resp.json()["default_branch"]
+
+            tree_resp = await client.get(
+                f"{GITHUB_API}/repos/{repo_full_name}/git/trees/{default_branch}",
+                headers=headers,
+                params={"recursive": "1"},
+            )
+            tree_resp.raise_for_status()
+            return tree_resp.json()["tree"]
+
+    async def get_file_content(self, installation_id: str, repo_full_name: str, path: str) -> str:
+        """Fetch one file's content, decoded from the Contents API's base64 encoding."""
+        token = await self.get_installation_token(installation_id)
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{GITHUB_API}/repos/{repo_full_name}/contents/{path}",
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+            )
+            resp.raise_for_status()
+            return base64.b64decode(resp.json()["content"]).decode("utf-8")
+
 
 github_app_client = GitHubAppClient()

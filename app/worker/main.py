@@ -5,10 +5,11 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.models import Candidate, Decision, DiscussionUnit, utcnow
+from app.db.models import Candidate, Decision, DiscussionUnit, GitHubInstallation, utcnow
 from app.db.session import async_session
 from app.pipeline.candidate_filter import score_unit
 from app.pipeline.extraction import extract_decision
+from app.pipeline.github_index import sync_repo_index
 from app.pipeline.supersession import classify_relationship
 
 logger = logging.getLogger("arbordocs.worker")
@@ -112,6 +113,36 @@ async def run_supersession(decisions: list[Decision]) -> None:
                 logger.debug("no similar active decisions found: decision=%s", fresh_decision.id)
 
 
+async def run_github_sync() -> None:
+    """Phase 5 GitHub content index (SPEC.md §4). Runs at its own, much
+    slower interval than the rest of the poll loop (repo content changes far
+    less often than Discord chat) — gated by each installation's
+    `last_synced_at` rather than a separate process/schedule, to fit the
+    existing single-worker-process deploy model.
+    """
+    cutoff = utcnow() - timedelta(seconds=settings.github_sync_interval_seconds)
+    async with async_session() as db:
+        installations = (
+            await db.scalars(
+                select(GitHubInstallation).where(
+                    (GitHubInstallation.last_synced_at.is_(None))
+                    | (GitHubInstallation.last_synced_at < cutoff)
+                )
+            )
+        ).all()
+
+        for installation in installations:
+            documents = await sync_repo_index(db, installation.project_id)
+            installation.last_synced_at = utcnow()
+            await db.commit()
+            logger.info(
+                "github repo synced: project=%s repo=%s documents=%d",
+                installation.project_id,
+                installation.repo_full_name,
+                len(documents),
+            )
+
+
 async def poll_once() -> None:
     closed = await close_due_units()
     if closed:
@@ -121,6 +152,7 @@ async def poll_once() -> None:
             decisions = await run_extraction(candidates)
             if decisions:
                 await run_supersession(decisions)
+    await run_github_sync()
 
 
 async def run_forever() -> None:

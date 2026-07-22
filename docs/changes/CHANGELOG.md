@@ -5,6 +5,48 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Phase 5, piece 1 — GitHub content ingestion)
+- New unified `RepoDocument` table (migration `0005_github_content_index`):
+  one row per doc section or code symbol, distinguished by a `kind` column
+  (`doc_section`/`code_symbol`) rather than two separate tables, since both
+  are "a chunk of repo content with an embedding" that reconciliation needs
+  to query together. `GitHubInstallation` gains a nullable `last_synced_at`
+  timestamp.
+- `app/ingestion/github/client.py` — `GitHubAppClient` gains
+  `get_repo_tree(installation_id, repo_full_name)` (recursive Git Trees API,
+  one call for the whole file listing) and
+  `get_file_content(installation_id, repo_full_name, path)` (Contents API,
+  base64-decoded), following the client's existing style exactly (short-lived
+  `httpx.AsyncClient()` per call, installation-token auth).
+- `app/pipeline/github_index.py` — `parse_doc_sections` splits a markdown
+  file into sections by heading with GitHub-style anchor slugs;
+  `parse_code_symbols` walks a Python file's stdlib `ast.parse()` tree for
+  top-level functions/classes and class methods (dotted names for methods,
+  e.g. `Bar.method_a`); `sync_repo_index` orchestrates listing the installed
+  repo's tree, fetching markdown/`.py` files under configurable size/count
+  caps, parsing, embedding each chunk (`get_embedder()`), and replacing the
+  project's `RepoDocument` rows wholesale on resync.
+- `app/config.py` / `.env.example` — `github_sync_interval_seconds` (3600),
+  `github_sync_max_file_size_bytes` (200,000), `github_sync_max_files` (500).
+- `app/worker/main.py` — `run_github_sync` added to the existing poll loop,
+  gated per-`GitHubInstallation` by `last_synced_at` vs. the configured
+  interval rather than a separate process/schedule.
+- `tests/test_github_index.py` — 8 tests: heading-based doc splitting +
+  anchors, headingless-file edge case, function/class/method symbol
+  extraction, invalid-Python edge case, `sync_repo_index` creating documents
+  from a fake GitHub client + fake embedder, size-cap filtering, resync
+  replacing rather than duplicating rows, and the no-installation-attached
+  edge case.
+- Verified end-to-end against the real ArborDocs GitHub repo via a live
+  GitHub App installation (`installation_id=148287703`,
+  `RujulP14/arbordocs`) — not just unit tests: `sync_repo_index` produced
+  236 real `RepoDocument` rows (70 doc sections, 166 code symbols) across
+  every `.md`/`.py` file in the repo. Spot-checked anchors match expected
+  format exactly, e.g.
+  `docs/SPEC.md#5-the-decision-extractor-the-make-or-break-component` and
+  `app/pipeline/extraction.py#extract_decision` (lines 238-300). Full test
+  suite (41 tests) and `ruff check`/`ruff format --check` both clean.
+
 ### Added (Phase 4, Stage 3 implementation)
 - `Decision` gains `statement_embedding`, `supersedes`, `superseded_by`
   columns (migration `0004_supersession_tracking`) — `status` is no longer
