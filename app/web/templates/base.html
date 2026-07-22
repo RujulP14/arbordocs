@@ -11,7 +11,7 @@
     <a href="/projects" class="brand">ArborDocs</a>
     {% if user %}
       <span class="user">{{ user.github_login }}</span>
-      <form method="post" action="/auth/github/logout" style="display:inline">
+      <form method="post" action="/auth/github/logout">
         <button type="submit">Log out</button>
       </form>
     {% endif %}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Decision — {{ project.name }}{% endblock %}
+{% block content %}
+  <a href="/projects/{{ project.id }}/decisions" class="back-link">← Review queue</a>
+
+  <div class="decision-header">
+    <div class="statement-block">
+      <span class="badge">{{ decision.type }}</span>
+      <span class="badge badge-confidence">confidence {{ "%.0f"|format(decision.confidence * 100) }}%</span>
+      <h1 class="decision-title">{{ decision.statement }}</h1>
+    </div>
+    <span class="status-pill badge-status-{{ decision.status }}">{{ decision.status }}</span>
+  </div>
+
+  <div class="decision-layout">
+    <div class="main-column">
+      <div class="card">
+        <p class="section-title">Details</p>
+        <dl class="field-grid">
+          <dt>Scope</dt><dd>{{ decision.scope or "—" }}</dd>
+          <dt>Rationale</dt><dd>{{ decision.rationale or "—" }}</dd>
+          <dt>Decider</dt><dd>{{ decision.decider or "—" }}</dd>
+          <dt>Participants</dt><dd>{{ decision.participants|join(", ") if decision.participants else "—" }}</dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <p class="section-title">Source messages</p>
+        <ul class="transcript">
+          {% for link in message_links %}
+            <li class="transcript-message">
+              {% if link.message %}
+                <div class="transcript-meta">
+                  <span class="transcript-author">{{ link.message.author_name or link.message.author_id }}</span>
+                  <span class="transcript-time">{{ link.message.created_at.strftime("%b %d, %Y %H:%M") }}</span>
+                  {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="transcript-link">↗</a>{% endif %}
+                </div>
+                <div class="transcript-content">{{ link.message.content }}</div>
+              {% else %}
+                <div class="transcript-meta">
+                  <span class="transcript-author">Unknown message</span>
+                  {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="transcript-link">↗</a>{% endif %}
+                </div>
+                <div class="transcript-content empty">Message {{ link.id }} was not found (may have been deleted).</div>
+              {% endif %}
+            </li>
+          {% else %}
+            <li class="empty">No source messages recorded.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="card">
+        <p class="section-title">Reconciliation</p>
+        {% if decision.reconciliation %}
+          <p><span class="badge">{{ decision.reconciliation.state }}</span></p>
+          <h3>Related code</h3>
+          <ul class="related-list">
+            {% for path in decision.reconciliation.related_code %}
+              <li>{{ path }}</li>
+            {% else %}
+              <li class="empty" style="padding: 0.4rem 0.6rem;">None found.</li>
+            {% endfor %}
+          </ul>
+          <h3>Related docs</h3>
+          <ul class="related-list">
+            {% for path in decision.reconciliation.related_docs %}
+              <li>{{ path }}</li>
+            {% else %}
+              <li class="empty" style="padding: 0.4rem 0.6rem;">None found.</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="empty">Not yet reconciled.</p>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <p class="section-title">Supersession</p>
+        <ul class="link-list">
+          <li>
+            Supersedes:
+            {% if supersedes %}
+              <a href="/projects/{{ project.id }}/decisions/{{ supersedes.id }}">{{ supersedes.statement }}</a>
+            {% else %}—{% endif %}
+          </li>
+          <li>
+            Superseded by:
+            {% if superseded_by %}
+              <a href="/projects/{{ project.id }}/decisions/{{ superseded_by.id }}">{{ superseded_by.statement }}</a>
+            {% else %}—{% endif %}
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sidebar-card card">
+      <h2>Review</h2>
+      <div class="actions">
+        <form method="post" action="/decisions/{{ decision.id }}/approve">
+          <button type="submit" class="button">Approve</button>
+        </form>
+        <form method="post" action="/decisions/{{ decision.id }}/reject">
+          <button type="submit" class="button button-danger">Reject</button>
+        </form>
+      </div>
+
+      <ul class="meta-list">
+        <li><span class="meta-key">Authority</span><span class="meta-val">{{ decision.authority_tier }}</span></li>
+        <li><span class="meta-key">Channel</span><span class="meta-val">{{ decision.channel_id }}</span></li>
+        <li><span class="meta-key">Decided</span><span class="meta-val">{{ decision.timestamp.strftime("%b %d, %Y") }}</span></li>
+      </ul>
+
+      <details class="edit-details">
+        <summary>Edit statement</summary>
+        <form method="post" action="/decisions/{{ decision.id }}/edit" class="edit-form">
+          <textarea name="statement" rows="4" required>{{ decision.statement }}</textarea>
+          <input type="text" name="rationale" value="{{ decision.rationale or '' }}" placeholder="Rationale (optional)">
+          <button type="submit" class="button button-secondary">Save changes</button>
+        </form>
+      </details>
+    </div>
+  </div>
+{% endblock %}

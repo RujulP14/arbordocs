@@ -111,10 +111,15 @@ class ArborDocsBot(discord.Client):
             )
             if message_row is None or message_row.discussion_unit_id is None:
                 return
+            existing_reactions = list(message_row.reactions or [])
+            if not any(r.get("emoji") == CHECK_MARK_EMOJI for r in existing_reactions):
+                existing_reactions.append({"emoji": CHECK_MARK_EMOJI, "count": 1})
+                message_row.reactions = existing_reactions
+
             unit = await db.get(DiscussionUnit, message_row.discussion_unit_id)
             if unit is not None and unit.status == "open":
                 unit.signal_close_requested = True
-                await db.commit()
+            await db.commit()
 
 
 def run() -> None:
