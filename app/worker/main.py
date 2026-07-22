@@ -10,6 +10,7 @@ from app.db.session import async_session
 from app.pipeline.candidate_filter import score_unit
 from app.pipeline.extraction import extract_decision
 from app.pipeline.github_index import sync_repo_index
+from app.pipeline.reconciliation import reconcile_decision
 from app.pipeline.supersession import classify_relationship
 
 logger = logging.getLogger("arbordocs.worker")
@@ -113,6 +114,28 @@ async def run_supersession(decisions: list[Decision]) -> None:
                 logger.debug("no similar active decisions found: decision=%s", fresh_decision.id)
 
 
+async def run_reconciliation(decisions: list[Decision]) -> None:
+    """Phase 5 tier-b reconciliation (SPEC.md §4) over each newly-extracted
+    decision — surfaces related repo code/docs by embedding similarity for a
+    human to confirm. No-op per decision if it has no scope, no statement
+    embedding, or the project has no synced RepoDocument rows yet.
+    """
+    async with async_session() as db:
+        for decision in decisions:
+            fresh_decision = await db.get(Decision, decision.id)
+            reconciliation = await reconcile_decision(db, fresh_decision)
+            await db.commit()
+            if reconciliation is not None:
+                logger.info(
+                    "decision reconciled: decision=%s related_code=%d related_docs=%d",
+                    fresh_decision.id,
+                    len(reconciliation["related_code"]),
+                    len(reconciliation["related_docs"]),
+                )
+            else:
+                logger.debug("no reconciliation performed: decision=%s", fresh_decision.id)
+
+
 async def run_github_sync() -> None:
     """Phase 5 GitHub content index (SPEC.md §4). Runs at its own, much
     slower interval than the rest of the poll loop (repo content changes far
@@ -152,6 +175,7 @@ async def poll_once() -> None:
             decisions = await run_extraction(candidates)
             if decisions:
                 await run_supersession(decisions)
+                await run_reconciliation(decisions)
     await run_github_sync()
 
 

@@ -192,8 +192,12 @@ class Decision(Base):
     (SPEC.md §5): semantic retrieval over `statement_embedding` finds
     existing active decisions a new one might relate to; an LLM classifies
     the relationship (unrelated/amendment/reversal/duplicate) and, for
-    reversal/duplicate, the chain is updated here. `reconciliation` (Phase 5)
-    is still deferred — added in a later migration once that stage exists.
+    reversal/duplicate, the chain is updated here. `reconciliation` (Phase 5,
+    tier-b) is populated by `app/pipeline/reconciliation.py`: embedding
+    retrieval over the project's `RepoDocument` index surfaces related code/
+    docs for a human to confirm — `state` is always `"unverified"` in v1
+    since tier-a (concrete contradiction detection, the only path to
+    `"consistent"`/`"contradiction"`) is deferred to Phase 6.
     """
 
     __tablename__ = "decisions"
@@ -225,6 +229,7 @@ class Decision(Base):
     superseded_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("decisions.id"), nullable=True
     )
+    reconciliation: Mapped[dict | None] = mapped_column(JsonColumn, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     candidate: Mapped["Candidate"] = relationship()

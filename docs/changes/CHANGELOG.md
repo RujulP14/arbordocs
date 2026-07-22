@@ -5,6 +5,47 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Phase 5, piece 2 — reconciliation engine, tier-b)
+- `Decision` gains a `reconciliation` JSON column (migration
+  `0006_decision_reconciliation`), matching SPEC.md §6's exact shape
+  (`state`, `related_code`, `related_docs`, `notes`).
+- `app/pipeline/reconciliation.py` — `find_related_repo_documents` retrieves
+  `RepoDocument` rows above `settings.reconciliation_similarity_threshold`
+  (cosine similarity scored in Python, same pattern as Stage 0/1/3);
+  `reconcile_decision` reuses the decision's existing `statement_embedding`
+  (computed at Stage 2 extraction time, no redundant embedding call), splits
+  results into `related_code`/`related_docs` by `RepoDocument.kind`,
+  formats each as `path#anchor`, caps each list at `settings.
+  reconciliation_max_related`, and always writes `state="unverified"` —
+  tier-a (concrete contradiction detection, the only path to
+  `"consistent"`/`"contradiction"`) is Phase 6 scope, so this piece never
+  emits those states. No LLM call: tier-b is pure embedding retrieval, no
+  `SYSTEM_PROMPT`/schema/provider dispatch needed. Returns `None` without
+  modifying the decision when it has no `scope`, no `statement_embedding`,
+  or the project has zero `RepoDocument` rows (repo not connected/synced).
+- `app/config.py` / `.env.example` — `reconciliation_similarity_threshold`
+  (0.35 — lower than Stage 3's 0.5 since decision statements and code/doc
+  content are more semantically distant than two decision statements),
+  `reconciliation_max_related` (5).
+- `app/worker/main.py` — `run_reconciliation` added to the poll loop, called
+  right after `run_supersession` on every batch of newly-extracted
+  decisions.
+- `tests/test_reconciliation.py` — 7 tests: threshold filtering, project
+  scoping, the three no-op edge cases (no scope, no statement embedding, no
+  synced `RepoDocument` rows), correct `related_code`/`related_docs`
+  splitting with `path#anchor` formatting, and the max-related cap.
+- Verified end-to-end against real data (not just unit tests): ran
+  `reconcile_decision` against two decisions and the real 236-row
+  `RepoDocument` index from the actual ArborDocs repo (indexed during
+  piece 1's verification). A decision about the worker poll loop correctly
+  surfaced `app/worker/main.py#run_forever`/`#poll_once` and
+  `docs/ARCHITECTURE.md#job-queue`/`#processes`; a decision about switching
+  the extraction LLM provider correctly surfaced
+  `app/pipeline/extraction.py#extract_decision` and the matching SPEC.md/
+  CHANGELOG.md sections — confirming the embedding-similarity retrieval
+  surfaces semantically relevant content, not noise. Full test suite (48
+  tests) and `ruff check`/`ruff format --check` both clean.
+
 ### Added (Phase 5, piece 1 — GitHub content ingestion)
 - New unified `RepoDocument` table (migration `0005_github_content_index`):
   one row per doc section or code symbol, distinguished by a `kind` column

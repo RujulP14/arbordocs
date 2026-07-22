@@ -121,8 +121,35 @@ is checked off.
       `docs/SPEC.md#5-the-decision-extractor-the-make-or-break-component`
       and `app/pipeline/extraction.py#extract_decision` (lines 238-300).
       8 unit tests in `tests/test_github_index.py` cover parsing, size-cap
-      filtering, and resync-replaces-not-duplicates behavior. Reconciliation
-      engine (querying this index) is the next Phase 5 piece.
+      filtering, and resync-replaces-not-duplicates behavior.
+      **Piece 2, reconciliation engine (tier-b), done:** `app/pipeline/
+      reconciliation.py` — `find_related_repo_documents` retrieves
+      `RepoDocument` rows above `settings.reconciliation_similarity_threshold`
+      (Python-scored cosine similarity, same pattern as Stage 0/1/3);
+      `reconcile_decision` reuses the decision's existing
+      `statement_embedding` (no redundant embedding call), splits results
+      into `related_code`/`related_docs` by `kind`, caps each at
+      `settings.reconciliation_max_related`, and writes a `reconciliation`
+      dict (`Decision` gained this JSON column, migration
+      `0006_decision_reconciliation`) matching SPEC.md §6's exact shape.
+      `state` is always `"unverified"` — tier-a (concrete contradiction
+      detection) is Phase 6 scope, so this piece never emits
+      `"consistent"`/`"contradiction"`. No LLM call: tier-b is pure
+      embedding retrieval. Wired into the worker (`run_reconciliation`,
+      called after `run_supersession` in `poll_once`). Verified end-to-end
+      against real data: two decisions run through `reconcile_decision`
+      against the real 236-row `RepoDocument` index (from piece 1's
+      verification) — a decision about the worker poll loop correctly
+      surfaced `app/worker/main.py#run_forever`/`#poll_once` and
+      `docs/ARCHITECTURE.md#job-queue`/`#processes`; a decision about
+      switching the extraction LLM provider correctly surfaced
+      `app/pipeline/extraction.py#extract_decision` and the matching
+      SPEC.md/CHANGELOG.md sections. 7 unit tests in
+      `tests/test_reconciliation.py` cover threshold filtering, project
+      scoping, the three no-op edge cases (no scope, no embedding, no
+      synced repo documents), correct code/doc splitting with anchors, and
+      the max-related cap. Human review UI (surfacing these flags) is the
+      next Phase 5 piece.
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**
