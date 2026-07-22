@@ -95,7 +95,13 @@ API reference) into sections. Parse code into symbols (functions, classes,
 endpoints, config keys) via AST. Build a lightweight per-project index of
 symbols and doc sections that the reconciliation engine can query. GitHub's
 role is to be the objective, measurable side of the system — not to
-auto-update docs.
+auto-update docs. Implemented in `app/pipeline/github_index.py`
+(`RepoDocument` table, migration `0005_github_content_index`); verified
+end-to-end against the real ArborDocs GitHub repo via a live GitHub App
+installation — 236 `RepoDocument` rows (70 doc sections, 166 code symbols)
+with correct GitHub-style anchors, e.g.
+`docs/SPEC.md#5-the-decision-extractor-the-make-or-break-component` and
+`app/pipeline/extraction.py#extract_decision`.
 
 **Decision extractor.** The core NLP pipeline. See §5 for the full design.
 

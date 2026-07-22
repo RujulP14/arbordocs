@@ -40,5 +40,10 @@ class Settings(BaseSettings):
     # Phase 4, Stage 3 — supersession/reversal tracking.
     supersession_similarity_threshold: float = 0.5
 
+    # Phase 5 — GitHub content ingestion (docs + code index).
+    github_sync_interval_seconds: int = 3600
+    github_sync_max_file_size_bytes: int = 200_000
+    github_sync_max_files: int = 500
+
 
 settings = Settings()
