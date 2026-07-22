@@ -110,7 +110,16 @@ check it against GitHub. Two tiers: (a) for decisions that map to a detectable
 code/doc pattern, flag concrete contradictions; (b) otherwise, use embedding
 similarity to surface the files/docs the decision likely affects and let a human
 confirm. "Surface + human-confirm" is an acceptable v1 — full semantic
-reconciliation is explicitly out of scope.
+reconciliation is explicitly out of scope. Tier-b implemented in
+`app/pipeline/reconciliation.py` (`reconcile_decision`, always writes
+`state="unverified"` since tier-a is Phase 6 scope); verified against two
+real decisions and the 236-row `RepoDocument` index from the real ArborDocs
+repo: a decision about the worker poll loop correctly surfaced
+`app/worker/main.py#run_forever`/`#poll_once` and
+`docs/ARCHITECTURE.md#job-queue`/`#processes`; a decision about switching the
+extraction LLM provider correctly surfaced
+`app/pipeline/extraction.py#extract_decision` and the matching SPEC.md/
+CHANGELOG.md sections.
 
 **Human review.** Each extracted decision or flagged contradiction appears as a
 review item: the decision statement, source message links, confidence, and any

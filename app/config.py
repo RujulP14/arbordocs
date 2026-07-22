@@ -45,5 +45,9 @@ class Settings(BaseSettings):
     github_sync_max_file_size_bytes: int = 200_000
     github_sync_max_files: int = 500
 
+    # Phase 5 — reconciliation engine (tier-b: embedding-similarity surfacing).
+    reconciliation_similarity_threshold: float = 0.35
+    reconciliation_max_related: int = 5
+
 
 settings = Settings()
