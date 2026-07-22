@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db.models import Candidate, Decision, DiscussionUnit, Message, ProjectChannel
+from app.pipeline.embeddings import get_embedder
 
 TRANSCRIPT_TAG = "discord_transcript"
 
@@ -283,6 +284,7 @@ async def extract_decision(
         project_id=unit.project_id,
         candidate_id=candidate.id,
         statement=result["statement"],
+        statement_embedding=get_embedder().embed(result["statement"]),
         type=result["type"],
         scope=result["scope"] or None,
         rationale=result["rationale"] or None,

@@ -37,5 +37,8 @@ class Settings(BaseSettings):
     candidate_embedding_threshold: float = 0.5
     worker_poll_interval_seconds: int = 60
 
+    # Phase 4, Stage 3 — supersession/reversal tracking.
+    supersession_similarity_threshold: float = 0.5
+
 
 settings = Settings()

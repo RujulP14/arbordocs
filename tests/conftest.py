@@ -53,10 +53,11 @@ def fake_embedder():
 class FakeGroqClient:
     """Deterministic fake Groq client for tests — no real API calls.
 
-    `responses` is a list of dicts matching the Stage 2 extraction schema
-    (see app/pipeline/extraction.py:build_extraction_schema); each call to
-    `.chat.completions.create(...)` pops the next one and returns it as a
-    canned structured-output response.
+    `responses` is a list of dicts matching whatever structured-output
+    schema the caller is testing (Stage 2's app/pipeline/extraction.py:
+    build_extraction_schema, or Stage 3's app/pipeline/supersession.py:
+    build_classification_schema); each call to `.chat.completions.create(...)`
+    pops the next one and returns it as a canned structured-output response.
     """
 
     def __init__(self, responses: list[dict]) -> None:
