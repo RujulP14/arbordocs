@@ -251,8 +251,14 @@ Stage 0 discussion reconstruction.
 - **Embeddings + vector search:** local `sentence-transformers` for high-frequency
   Stage 0/1 embeddings, stored in **Postgres + pgvector** (one DB for records,
   embeddings, and ledger — do not add a separate vector DB).
-- **LLM:** Claude or OpenAI API for the Stage 2 gate/extraction and Stage 3
-  relationship classification. Use structured/JSON output.
+- **LLM:** Groq (`openai/gpt-oss-120b`) for the Stage 2 gate/extraction and
+  Stage 3 relationship classification — chosen after a side-by-side
+  comparison against Gemini and a local Ollama model (`eval/
+  compare_providers.py`); Groq's free tier gave the most accurate `type`
+  classification and best-calibrated confidence scores. Use structured/JSON
+  output (`response_format.json_schema`, `strict: true`). Ollama
+  (`qwen2.5:7b`, fully local, no API key) remains available via
+  `extract_decision(..., provider="ollama")` as a no-cost fallback.
 - **Frontend:** FastAPI + Jinja2 templates (+ HTMX for interactivity) for both the
   review UI and the read-only portal — kept in Python end-to-end, no separate
   JS framework/build step.

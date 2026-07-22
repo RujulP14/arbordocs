@@ -5,6 +5,57 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Phase 4, Stage 2 implementation)
+- New `Decision` model + Alembic migration `0003_decision_extraction`: the
+  Stage 2 output table (`statement`, `type`, `scope`, `rationale`, `decider`,
+  `participants`, `message_ids`, `authority_tier`, `confidence`, `status`
+  fixed at `"active"` for now — `supersedes`/`superseded_by`/`reconciliation`
+  deferred to Stage 3/Phase 5).
+- `app/pipeline/extraction.py` — Stage 2 gate+extract: one LLM call per
+  `Candidate` decides `resolved: bool` and, if true, fills the decision
+  schema grounded in cited `message_ids` (schema-enforced enum of the
+  discussion unit's actual message ids — citing a message the model didn't
+  see is a validation failure, not just a prompt request). Supports two
+  interchangeable providers via `extract_decision(..., provider=...)`:
+  Groq, Ollama.
+- `app/worker/main.py` — `run_extraction` runs Stage 2 on every candidate
+  Stage 1 flags, called right after `run_candidate_filter` in `poll_once`.
+- `eval/compare_providers.py` — side-by-side comparison runner
+  (`uv run python -m eval.compare_providers [--providers ...] [--full] [--verbose]`)
+  over 4 curated labeled threads + 1 real Discord thread by default, or the
+  full 24-thread labeled dataset with `--full` (prints a per-provider gate
+  accuracy tally).
+- **Provider decision: Groq (`openai/gpt-oss-120b`) is the default.**
+  Initially compared against Gemini and Ollama (`qwen2.5:7b`, fully local)
+  on 5 curated threads: Gemini was never verified (no working API key was
+  available), Groq and Ollama both reached 5/5 correct gate decisions.
+  Re-run against the full 24-thread dataset: **both landed at 22/24**, but
+  with opposite failure modes — Groq's 2 misses were false positives on
+  jokes with decision-like phrasing (the exact pattern Stage 2 exists to
+  catch); Ollama's 2 misses were false negatives on real decisions (missed
+  a ✅-confirmed decision and an explicit "the policy is X" statement), plus
+  weaker extraction quality overall (occasional empty `statement`,
+  citation-only `rationale`, uncalibrated `confidence` flipping between 0
+  and 1, some `type` mislabeling). Ollama's initial empty-`statement` issue
+  was fixed by adding a `description` to every schema field (a
+  generalizable structured-output robustness improvement, not
+  Ollama-specific). Groq's stronger extraction quality tipped the decision;
+  Ollama remains available as a no-cost, no-API-key fallback via
+  `provider="ollama"`. Gemini's code was removed entirely after the
+  comparison concluded — no code, config, or dependency for it remains.
+
+### Added (Phase 3 implementation)
+- `eval/dataset.py` — 24 hand-labeled synthetic threads (technical/policy/
+  process/product decisions; open-question/unresolved-proposal/provisional/
+  joke/status-update/casual non-decisions) + `INTERLEAVED_GROUPS` for a
+  deliberate Stage 0 multi-topic stress scenario.
+- `eval/harness.py` — runs the dataset through the real Stage 0 + Stage 1
+  pipeline (real embedding model) and reports decision-detection
+  precision/recall/F1 via `sklearn`, plus a separate Stage 0 grouping-purity
+  metric. Current numbers: precision=0.73, recall=1.00, F1=0.85 — all four
+  misses are false positives on joke/casual chat with decision-like
+  phrasing, which Stage 2's LLM gate (added this same session) now fixes.
+
 ### Added (Phase 2 implementation)
 - Postgres schema additions (Alembic migration `0002_discussion_reconstruction`):
   `discussion_units`, `candidates` tables; `messages` gained `discussion_unit_id`

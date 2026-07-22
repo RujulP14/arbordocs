@@ -50,6 +50,31 @@ is checked off.
 - [ ] **Phase 4 — Stage 2 + Stage 3.**
       LLM extraction into the schema; supersession tracking. Re-run eval, add
       the supersession-classification metric.
+      **Stage 2 done, Stage 3 not started.** `app/pipeline/extraction.py`
+      does the gate+extract call (SPEC.md §5) into a new `decisions` table
+      (migration `0003_decision_extraction.py`), wired into the `worker`'s
+      poll loop right after Stage 1 (`run_extraction` in
+      `app/worker/main.py`). Supports two interchangeable providers
+      (`extract_decision(..., provider=...)`) — compared side-by-side via
+      `eval/compare_providers.py`, first against 5 curated threads and then
+      the full 24-thread labeled dataset (`--full`). **Groq
+      (`openai/gpt-oss-120b`)** is the default: 22/24 correct gate decisions
+      on the full dataset, misses being 2 false positives on jokes with
+      decision-like phrasing (the same failure mode Stage 2 exists to fix —
+      a stricter gate prompt could plausibly tighten this further).
+      **Ollama (`qwen2.5:7b`, fully local, no API key)** also reached 22/24,
+      but with the opposite failure mode — 2 false negatives, missing real
+      decisions (one ✅-confirmed, one an explicit "the policy is X")
+      — plus weaker extraction quality throughout: occasional empty
+      `statement`, citation-only `rationale` (e.g. just `['thread-id-1']`
+      instead of prose), uncalibrated `confidence` (flips between 0 and 1
+      with no correlation to certainty), and some `type` mislabeling.
+      Ollama remains available as a no-cost fallback via `provider="ollama"`.
+      Gemini was scoped and implemented first but dropped entirely after
+      never being verified end-to-end (no working API key was available)
+      and after Groq/Ollama both proved out — no Gemini code remains.
+      Stage 3 (supersession tracking) is unbuilt — no
+      `supersedes`/`superseded_by` columns exist yet on `decisions`.
 - [ ] **Phase 5 — GitHub ingestion + reconciliation (tier-b first) + human
       review UI + decision store + portal + audit ledger.**
       This is the shippable v1 checkpoint.
