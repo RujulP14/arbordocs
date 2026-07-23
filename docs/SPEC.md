@@ -129,7 +129,12 @@ draft-only vs. auto-commit for high-confidence structural items.
 **Decision store + portal.** Postgres-backed store of decision records. A
 generated, read-only, searchable site renders current active decisions and
 their history. No manual edit UI — maintenance is the pipeline's job; consumption
-is read-only. (This is the "headless" framing.)
+is read-only. (This is the "headless" framing.) Implemented in
+`app/web/portal.py`: lists `status="active"` decisions filterable by
+`type`/`scope`, with a detail view showing the supersession chain and
+reconciliation flags. Login-gated rather than fully public — see
+[ADR-0008](decisions/0008-portal-login-gated.md); verified against a real
+`active` decision in the local dev database.
 
 **Audit ledger.** Append-only log of every detection, extraction, supersession,
 and human decision, with the source that triggered it. Separates *what changed*

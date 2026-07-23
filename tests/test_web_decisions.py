@@ -6,7 +6,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.db.models import Decision, DiscordGuild, Message, Project, ProjectChannel, User
 from app.db.session import get_db
-from app.web.deps import require_admin
+from app.web.deps import require_admin, require_login
 from app.web.main import app
 
 
@@ -24,6 +24,7 @@ async def client(db_session):
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[require_admin] = _override_require_admin
+    app.dependency_overrides[require_login] = _override_require_admin
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

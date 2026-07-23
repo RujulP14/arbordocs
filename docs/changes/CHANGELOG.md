@@ -5,6 +5,37 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Phase 5, piece 4 — decision store + portal)
+- `app/web/portal.py` — read-only portal: `GET /projects/{id}/portal` lists
+  `status="active"` decisions newest-first with optional `?type=`/`?scope=`
+  query-param filters; `GET /projects/{id}/portal/{decision_id}` shows the
+  full decision detail (source-message transcript, reconciliation flags,
+  supersession chain) with no approve/reject/edit controls. Reuses
+  `_resolve_message_url` from `app/web/decisions.py` rather than
+  duplicating it.
+- `app/web/deps.py` — new `require_login` dependency (any authenticated
+  user, admin or not); `require_admin` refactored to compose it (login
+  check, then admin check) instead of duplicating the session check.
+- New templates `portal_list.html`/`portal_detail.html`, matching the
+  existing card/badge/two-column conventions; `project_detail.html` gains
+  a "View portal" link alongside "Review decisions".
+- **[ADR-0008](../decisions/0008-portal-login-gated.md)**: the portal is
+  login-gated (`require_login`), not fully public — despite SPEC.md's
+  "headless" framing, no ADR had ever actually decided this. Chosen because
+  it composes cleanly with the not-yet-built `verified`-flag work (#16):
+  once non-admin verified users can log in, they see the portal
+  automatically, no code change needed.
+- `tests/test_web_portal.py` — 6 tests: active-only filtering (proposed/
+  rejected/superseded decisions never appear), type/scope query filters,
+  reconciliation + supersession rendering on the detail page, absence of
+  any review-action controls, and an unauthenticated request redirecting
+  to login.
+- Verified end-to-end against the real local Postgres DB: browsed the
+  portal for the project with a real `active` decision ("The team will use
+  REST for the new public API.") extracted earlier this session — renders
+  correctly, no approve/reject/edit controls present. Full test suite (67
+  tests) and `ruff check`/`ruff format --check` both clean.
+
 ### Fixed (Stage 1 recall — real-world testing)
 - `app/pipeline/candidate_filter.py` — `KEYWORD_PATTERNS` expanded from 10
   brittle exact phrases to ~55 patterns organized into 7 categories

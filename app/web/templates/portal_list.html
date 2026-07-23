@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Decisions — {{ project.name }}{% endblock %}
+{% block content %}
+  <a href="/projects/{{ project.id }}" class="back-link">← {{ project.name }}</a>
+  <h1>Decisions</h1>
+  <p style="color: var(--text-muted); margin-top: -0.25rem;">
+    Active decisions the team has made — read-only.
+  </p>
+
+  <form method="get" class="new-project-form">
+    <input type="text" name="type" placeholder="Filter by type" value="{{ type_filter }}">
+    <input type="text" name="scope" placeholder="Filter by scope" value="{{ scope_filter }}">
+    <button type="submit">Filter</button>
+  </form>
+
+  <ul class="decision-list">
+    {% for decision in decisions %}
+      <li>
+        <a class="decision-row" href="/projects/{{ project.id }}/portal/{{ decision.id }}">
+          <span class="statement">{{ decision.statement }}</span>
+          <span class="badge">{{ decision.type }}</span>
+          {% if decision.scope %}<span class="badge">{{ decision.scope }}</span>{% endif %}
+          <span class="badge badge-confidence">confidence {{ "%.0f"|format(decision.confidence * 100) }}%</span>
+        </a>
+      </li>
+    {% else %}
+      <li class="empty">No active decisions yet.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}
