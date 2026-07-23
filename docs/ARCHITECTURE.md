@@ -69,7 +69,10 @@ for the multi-tenant/project model.
 5. **LLM gate + extraction (Stage 2, async worker).**
    Worker pulls a candidate off the queue, LLM gates ("real decision or just
    discussion?"), then extracts into the fixed schema (see SPEC.md §6),
-   citing `message_ids`. Written to `decisions` as `status: proposed`.
+   citing `message_ids`. Written to `decisions` as `status: proposed`. If a
+   `decider` was identified, they're immediately sent a Discord DM noting
+   the decision and linking to it — a DM failure is logged but never
+   blocks the pipeline.
 
 6. **Supersession check (Stage 3, per new decision).**
    Vector search over existing `active` decisions (API-quality embeddings —

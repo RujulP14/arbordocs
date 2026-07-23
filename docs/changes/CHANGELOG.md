@@ -5,6 +5,33 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Discord DM notification to the decider)
+- `app/ingestion/discord/client.py` — `DiscordBotClient.send_dm(user_id,
+  content)`, the client's first outbound capability (opens a DM channel via
+  `POST /users/@me/channels`, sends via `POST /channels/{channel_id}/
+  messages`). Raises on failure — caller decides how to handle it.
+- `app/worker/main.py`'s `run_extraction` now attempts a DM to
+  `decision.decider` right after logging `decision_extracted`, containing
+  the statement + a link to the decision's portal page. Skipped entirely
+  if `decider` is empty (no fallback to `participants`). A DM failure is
+  caught, logged as `decider_notification_failed` via the audit ledger,
+  and never propagates into the pipeline; success logs `decider_notified`.
+- `tests/conftest.py` — new `FakeDiscordClient`/`fake_discord_client`
+  fixture mirroring `FakeGroqClient`'s shape (records calls, a
+  `should_fail` flag to simulate the external-failure path).
+- 3 new tests in `tests/test_audit_log.py`: DM sent + `decider_notified`
+  logged when `decider` is set; no DM attempted and no DM-related audit
+  row when `decider` is empty; a raising DM client is caught, the pipeline
+  still returns the decision normally, `decider_notification_failed` is
+  logged instead.
+- Verified against the real Discord API (not just unit tests): sent a
+  real DM to a real Discord account (`rujul14`) and confirmed it arrived
+  with the correct statement and portal link.
+- Note: the portal link is only actionable for deciders who already have
+  an ArborDocs account — full usefulness depends on the not-yet-built
+  verified-flag signup (issue #16), but the DM ships the link now since
+  it degrades gracefully (a login redirect) rather than blocking on that.
+
 ### Added (Phase 5, piece 5 — audit ledger, Phase 5 complete)
 - New `AuditLogEntry` model + migration `0007_audit_log` — one unified,
   append-only table (`event_type` discriminator) rather than per-stage

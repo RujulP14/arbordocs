@@ -78,3 +78,25 @@ class FakeGroqClient:
 @pytest.fixture
 def fake_groq_client():
     return lambda responses: FakeGroqClient(responses)
+
+
+class FakeDiscordClient:
+    """Deterministic fake DiscordBotClient for tests — no real Discord API
+    calls. Records every `send_dm` call; `should_fail` simulates the
+    external-failure path (closed DMs, bot removed, etc.) callers must
+    catch and log rather than let propagate.
+    """
+
+    def __init__(self, should_fail: bool = False) -> None:
+        self.should_fail = should_fail
+        self.dm_calls: list[tuple[str, str]] = []
+
+    async def send_dm(self, user_id: str, content: str) -> None:
+        self.dm_calls.append((user_id, content))
+        if self.should_fail:
+            raise RuntimeError("simulated Discord DM failure")
+
+
+@pytest.fixture
+def fake_discord_client():
+    return lambda should_fail=False: FakeDiscordClient(should_fail=should_fail)

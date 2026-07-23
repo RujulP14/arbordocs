@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.db.models import Candidate, Decision, DiscussionUnit, GitHubInstallation, utcnow
 from app.db.session import async_session
+from app.ingestion.discord.client import discord_bot_client
 from app.pipeline.audit import log_event
 from app.pipeline.candidate_filter import score_unit
 from app.pipeline.extraction import extract_decision
@@ -114,6 +115,32 @@ async def run_extraction(candidates: list[Candidate]) -> list[Decision]:
                         "confidence": decision.confidence,
                     },
                 )
+                if decision.decider:
+                    portal_url = f"{settings.base_url}/projects/{decision.project_id}/portal/{decision.id}"
+                    message = f'ArborDocs noted this decision: "{decision.statement}"\n{portal_url}'
+                    try:
+                        await discord_bot_client.send_dm(decision.decider, message)
+                    except Exception:
+                        logger.exception(
+                            "failed to DM decider: decision=%s decider=%s", decision.id, decision.decider
+                        )
+                        await log_event(
+                            db,
+                            decision.project_id,
+                            "decider_notification_failed",
+                            "decision",
+                            decision.id,
+                            payload={"decider": decision.decider},
+                        )
+                    else:
+                        await log_event(
+                            db,
+                            decision.project_id,
+                            "decider_notified",
+                            "decision",
+                            decision.id,
+                            payload={"decider": decision.decider},
+                        )
             else:
                 await log_event(
                     db,

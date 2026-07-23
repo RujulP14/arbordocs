@@ -49,5 +49,28 @@ class DiscordBotClient:
             resp.raise_for_status()
             return resp.json()
 
+    async def send_dm(self, user_id: str, content: str) -> None:
+        """Opens a DM channel with a Discord user (idempotent — Discord
+        returns the existing channel if one is already open) and sends a
+        message into it. Raises on any failure (closed DMs, invalid user
+        id, etc.) — callers decide whether/how to swallow that.
+        """
+        headers = {"Authorization": f"Bot {settings.discord_bot_token}"}
+        async with httpx.AsyncClient() as client:
+            channel_resp = await client.post(
+                f"{DISCORD_API}/users/@me/channels",
+                headers=headers,
+                json={"recipient_id": user_id},
+            )
+            channel_resp.raise_for_status()
+            channel_id = channel_resp.json()["id"]
+
+            message_resp = await client.post(
+                f"{DISCORD_API}/channels/{channel_id}/messages",
+                headers=headers,
+                json={"content": content},
+            )
+            message_resp.raise_for_status()
+
 
 discord_bot_client = DiscordBotClient()

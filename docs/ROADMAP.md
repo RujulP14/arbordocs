@@ -253,6 +253,33 @@ is checked off.
       `decision_approved` row with `actor="RujulP14"` (the real logged-in
       GitHub identity) — both entries render correctly, in chronological
       order, on the portal's History section.
+- [x] **Discord DM notification to the decider (post-Phase-5).** When
+      Stage 2 extracts a decision, the person identified as
+      `Decision.decider` gets a real Discord DM — "ArborDocs noted this
+      decision" plus the statement and a portal link — so they find out
+      immediately, before any human review. `DiscordBotClient` (`app/
+      ingestion/discord/client.py`) gained `send_dm` (opens a DM channel
+      via `POST /users/@me/channels`, then sends via `POST /channels/
+      {channel_id}/messages`) — the client's first outbound capability;
+      every prior method was read-only. Wired into `run_extraction`
+      (`app/worker/main.py`), right after the existing `decision_extracted`
+      audit entry: skipped entirely if `decider` is empty (no fallback to
+      `participants`), and a DM failure (closed DMs, bot removed, etc.) is
+      caught and logged as `decider_notification_failed` via the audit
+      ledger rather than propagating into the pipeline — success logs
+      `decider_notified`. The portal link is only actionable for deciders
+      who already have an ArborDocs account; full usefulness is gated on
+      the not-yet-built verified-flag signup (issue #16), but the DM ships
+      the link regardless since it degrades gracefully (a login redirect)
+      until then. 3 new unit tests in `tests/test_audit_log.py` (via a new
+      `FakeDiscordClient` fixture in `tests/conftest.py`, mirroring
+      `FakeGroqClient`'s shape) cover: DM sent + `decider_notified` logged
+      when `decider` is set; no DM attempted and no DM-related audit row
+      when `decider` is empty; a raising DM client is caught, the pipeline
+      still returns the decision normally, and
+      `decider_notification_failed` is logged instead. Verified against
+      the real Discord API (not just unit tests): sent a real DM to a real
+      Discord account, confirmed received.
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**
