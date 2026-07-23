@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Decision, Message, Project, User
+from app.db.models import AuditLogEntry, Decision, Message, Project, User
 from app.db.session import get_db
 from app.web.decisions import _resolve_message_url
 from app.web.deps import require_login
@@ -84,6 +84,14 @@ async def portal_detail(
     supersedes = await db.get(Decision, decision.supersedes) if decision.supersedes else None
     superseded_by = await db.get(Decision, decision.superseded_by) if decision.superseded_by else None
 
+    audit_entries = (
+        await db.scalars(
+            select(AuditLogEntry)
+            .where(AuditLogEntry.subject_type == "decision", AuditLogEntry.subject_id == decision.id)
+            .order_by(AuditLogEntry.created_at)
+        )
+    ).all()
+
     return templates.TemplateResponse(
         request,
         "portal_detail.html",
@@ -94,5 +102,6 @@ async def portal_detail(
             "message_links": message_links,
             "supersedes": supersedes,
             "superseded_by": superseded_by,
+            "audit_entries": audit_entries,
         },
     )

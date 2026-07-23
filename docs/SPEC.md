@@ -139,6 +139,12 @@ reconciliation flags. Login-gated rather than fully public — see
 **Audit ledger.** Append-only log of every detection, extraction, supersession,
 and human decision, with the source that triggered it. Separates *what changed*
 from *why the system proposed it*. Doubles as the decision-history feature.
+Implemented as `AuditLogEntry` (migration `0007_audit_log`), a single
+`event_type`-discriminated table logged via `app/pipeline/audit.py`'s
+`log_event` helper from every pipeline stage and human-review action;
+surfaced as a chronological "History" section on the portal detail page.
+Verified against real Postgres data: a real approve action produced a real
+`decision_approved` entry with the acting admin's GitHub login as `actor`.
 
 ---
 

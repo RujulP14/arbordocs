@@ -3,8 +3,9 @@ from datetime import UTC, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
-from app.db.models import Decision, DiscordGuild, Message, Project, ProjectChannel, User
+from app.db.models import AuditLogEntry, Decision, DiscordGuild, Message, Project, ProjectChannel, User
 from app.db.session import get_db
 from app.web.deps import require_admin, require_login
 from app.web.main import app
@@ -88,6 +89,14 @@ async def test_approve_flips_status_to_active(client):
     await db_session.refresh(decision)
     assert decision.status == "active"
 
+    entries = (
+        await db_session.scalars(select(AuditLogEntry).where(AuditLogEntry.subject_id == decision.id))
+    ).all()
+    assert len(entries) == 1
+    assert entries[0].event_type == "decision_approved"
+    assert entries[0].actor == "octocat"
+    assert entries[0].payload == {"old_status": "proposed", "new_status": "active"}
+
 
 async def test_reject_flips_status_to_rejected(client):
     ac, admin, db_session = client
@@ -101,6 +110,13 @@ async def test_reject_flips_status_to_rejected(client):
     assert resp.status_code == 303
     await db_session.refresh(decision)
     assert decision.status == "rejected"
+
+    entries = (
+        await db_session.scalars(select(AuditLogEntry).where(AuditLogEntry.subject_id == decision.id))
+    ).all()
+    assert len(entries) == 1
+    assert entries[0].event_type == "decision_rejected"
+    assert entries[0].actor == "octocat"
 
 
 async def test_edit_updates_statement_and_rationale_without_touching_embedding(client):
@@ -121,6 +137,14 @@ async def test_edit_updates_statement_and_rationale_without_touching_embedding(c
     assert decision.statement == "corrected statement"
     assert decision.rationale == "because reasons"
     assert decision.statement_embedding == [1.0] + [0.0] * 383
+
+    entries = (
+        await db_session.scalars(select(AuditLogEntry).where(AuditLogEntry.subject_id == decision.id))
+    ).all()
+    assert len(entries) == 1
+    assert entries[0].event_type == "decision_edited"
+    assert entries[0].payload["old_statement"] == "original"
+    assert entries[0].payload["new_statement"] == "corrected statement"
 
 
 async def test_detail_shows_reconciliation_flags_when_present(client):
