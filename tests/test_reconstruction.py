@@ -64,6 +64,30 @@ async def test_reply_joins_parent_unit(db_session, fake_embedder):
     assert "user-2" in reply_unit.participant_ids
 
 
+async def test_thread_message_joins_starter_units_unit(db_session, fake_embedder):
+    project = await _make_project(db_session)
+    starter = _message(project.id, discord_message_id="msg-1", content="unrelated chatter")
+    db_session.add(starter)
+    await db_session.flush()
+    starter_unit = await assign_message_to_discussion_unit(db_session, starter, embedder=fake_embedder)
+    await db_session.commit()
+
+    thread_message = _message(
+        project.id,
+        discord_message_id="msg-2",
+        author_id="user-2",
+        content="totally different topic, unrelated",
+        channel_id="thread-1",
+        thread_starter_message_id="msg-1",
+    )
+    db_session.add(thread_message)
+    await db_session.flush()
+    thread_unit = await assign_message_to_discussion_unit(db_session, thread_message, embedder=fake_embedder)
+
+    assert thread_unit.id == starter_unit.id
+    assert "user-2" in thread_unit.participant_ids
+
+
 async def test_temporal_cutoff_prevents_join(db_session, fake_embedder):
     project = await _make_project(db_session)
     old_time = datetime.now(UTC) - timedelta(minutes=settings.reconstruction_inactivity_minutes + 5)

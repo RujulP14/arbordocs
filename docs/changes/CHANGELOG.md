@@ -5,6 +5,40 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Discord Thread ingestion + grouping)
+- `Message` gains `thread_starter_message_id` (migration
+  `0009_thread_starter_message`, mirrors `reply_to_message_id`'s shape) —
+  Discord Threads have their own `channel.id`, distinct from the channel
+  they were created in, so they were previously invisible to ingestion
+  entirely.
+- `app/ingestion/discord/bot.py` — `on_message`/`on_reaction_add` resolve
+  tracking via a Thread's `parent_id` instead of its own id;
+  `_store_message` records `thread_starter_message_id` (a Thread's id
+  equals its starter message's id, per discord.py); new
+  `_backfill_channel_threads` backfills active + archived thread history
+  on bot startup, not just the parent channel.
+- `app/pipeline/reconstruction.py`'s `assign_message_to_discussion_unit`
+  gains a new deterministic join: a Thread message joins its starter
+  message's discussion unit directly, bypassing the similarity threshold
+  — the same way reply-chain already does. Reply-chain itself is
+  unchanged. Plain sequential messages remain an explicit non-goal;
+  `reconstruction_similarity_threshold` and the participant-continuity
+  fallback are untouched.
+- `tests/test_reconstruction.py` — 1 new test mirroring the existing
+  reply-chain test (deliberately dissimilar content, asserts the
+  threshold is bypassed); all 7 existing tests pass unchanged.
+- Verified via `eval/harness.py`: interleaved-groups Stage 0 purity held
+  at 1.00 — no regression, as expected.
+- Verified against a real Discord Thread (not just unit tests): posted a
+  starter message in a tracked channel, created a real Thread from it,
+  posted a 4-message decision conversation inside, reacted ✅ — confirmed
+  in Postgres that the starter message and all 4 thread messages share
+  one `discussion_unit_id`, the unit closed correctly with both real
+  participants recorded, and it extracted through the full pipeline into
+  a real `proposed` decision ("Cache search results with a 5-minute
+  TTL"). Full test suite (86 tests) and `ruff check`/`ruff format --check`
+  both clean.
+
 ### Added (Verified-flag login gating)
 - `User` gains a `verified: bool` column (migration `0008_user_verified`,
   default `False`); existing `is_admin=True` rows explicitly backfilled to

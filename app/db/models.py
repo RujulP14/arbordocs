@@ -117,6 +117,7 @@ class Message(Base):
     author_roles: Mapped[list] = mapped_column(JsonColumn, default=list, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     reply_to_message_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    thread_starter_message_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reactions: Mapped[list] = mapped_column(JsonColumn, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

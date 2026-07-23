@@ -42,19 +42,22 @@ for the multi-tenant/project model.
 ## End-to-end pipeline
 
 1. **Discord ingestion (continuous, event-driven).**
-   Bot listens live via gateway events (`on_message`, `on_reaction_add`, thread
-   events) for channels explicitly attached to a project (see
-   [decisions/0005-multi-tenant-projects.md](decisions/0005-multi-tenant-projects.md)).
-   On startup, backfills history for those channels. Every message is written
-   to the raw `messages` table immediately, unfiltered, tagged with its
-   `project_id`.
+   Bot listens live via gateway events (`on_message`, `on_reaction_add`) for
+   channels explicitly attached to a project (see
+   [decisions/0005-multi-tenant-projects.md](decisions/0005-multi-tenant-projects.md))
+   — including messages posted inside a Discord Thread of a tracked
+   channel, resolved via the Thread's parent channel id. On startup,
+   backfills history for those channels and their threads (active and
+   archived). Every message is written to the raw `messages` table
+   immediately, unfiltered, tagged with its `project_id`.
 
 2. **Discussion reconstruction (per incoming message).**
-   Assigns the message to a discussion unit: reply/thread parent if present,
-   else temporal proximity + participant overlap + embedding similarity to
-   recent messages in the same channel. `project_id` is a hard boundary —
-   messages in different projects never merge into the same unit. Units stay
-   open and keep absorbing messages.
+   Assigns the message to a discussion unit: reply parent or Thread starter
+   message if present (both deterministic, bypass the similarity
+   threshold), else temporal proximity + participant overlap + embedding
+   similarity to recent messages in the same channel. `project_id` is a
+   hard boundary — messages in different projects never merge into the
+   same unit. Units stay open and keep absorbing messages.
 
 3. **Discussion closing.**
    A unit closes on inactivity timeout OR an explicit signal (✅ reaction,

@@ -33,6 +33,18 @@ async def assign_message_to_discussion_unit(
             if unit is not None and unit.status == "open":
                 return _join_unit(unit, message)
 
+    if message.thread_starter_message_id:
+        # Discord Thread membership (issue #11) — an equally deterministic,
+        # structural signal as reply-chain, so it bypasses the similarity
+        # threshold the same way.
+        starter = await db.scalar(
+            select(Message).where(Message.discord_message_id == message.thread_starter_message_id)
+        )
+        if starter is not None and starter.discussion_unit_id is not None:
+            unit = await db.get(DiscussionUnit, starter.discussion_unit_id)
+            if unit is not None and unit.status == "open":
+                return _join_unit(unit, message)
+
     cutoff = message.created_at - timedelta(minutes=settings.reconstruction_inactivity_minutes)
     open_units = await db.scalars(
         select(DiscussionUnit)
