@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Decision, DiscordGuild, Message, Project, ProjectChannel, User
 from app.db.session import get_db
-from app.web.deps import require_admin
+from app.web.deps import require_admin, require_login
 from app.web.templating import templates
 
 router = APIRouter(tags=["decisions"])
@@ -107,13 +107,17 @@ async def decision_detail(
 async def open_source_message(
     decision_id: uuid.UUID,
     message_id: str,
-    user: User = Depends(require_admin),
+    user: User = Depends(require_login),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     """Same-origin redirect to a message's Discord permalink — the template
     never embeds the external discord.com URL directly in an `href`, only
     this relative, server-validated path (avoids a var-in-href XSS finding
     on a value that's always server-built, never user-controlled).
+
+    require_login, not require_admin: both the admin review UI and the
+    read-only portal link through this same route, and the portal is only
+    login-gated (ADR-0008), not admin-gated.
     """
     decision = await db.get(Decision, decision_id)
     if decision is None or message_id not in decision.message_ids:

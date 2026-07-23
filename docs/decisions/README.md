@@ -19,3 +19,4 @@ principle the product itself implements).
 | [0005](0005-multi-tenant-projects.md) | Multi-tenant model: single admin, per-project GitHub + Discord integrations | Accepted |
 | [0006](0006-admin-authorization-in-db.md) | Admin authorization lives in the DB, not an env allowlist | Accepted |
 | [0007](0007-single-github-app-for-login-and-repos.md) | One GitHub App for both admin login and repo access | Accepted |
+| [0008](0008-portal-login-gated.md) | Portal is login-gated, not fully public | Accepted |

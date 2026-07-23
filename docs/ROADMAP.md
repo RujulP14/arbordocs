@@ -198,6 +198,29 @@ is checked off.
       gap was found during this same testing — tracked as a separate
       GitHub issue since it's an independent, pre-existing limitation (see
       issue link), not part of this piece.
+      **Piece 4, decision store + portal, done:** `app/web/portal.py` — a
+      read-only sibling of the review UI (`app/web/decisions.py`), listing
+      `status="active"` decisions newest-first with optional `?type=`/
+      `?scope=` query filters (SPEC.md's "searchable" requirement), plus a
+      detail page reusing the exact same source-message/reconciliation/
+      supersession data assembly as the review UI, minus every
+      approve/reject/edit control. New `require_login` dependency
+      (`app/web/deps.py`) — any authenticated user, not just `is_admin` —
+      added alongside the existing `require_admin`; `require_admin` now
+      composes it (login check first, then admin check) rather than
+      duplicating the session check. Portal access is deliberately
+      login-gated, not fully public despite SPEC.md's "headless" framing —
+      recorded as [ADR-0008](decisions/0008-portal-login-gated.md), since
+      no ADR had ever actually decided this and it directly affects the
+      not-yet-built `verified`-flag work (issue #16). 6 unit tests in
+      `tests/test_web_portal.py` cover active-only filtering, type/scope
+      query filters, reconciliation/supersession rendering, absence of
+      any review-action controls, and an unauthenticated request correctly
+      redirecting to login. Verified end-to-end against the real local
+      Postgres DB: browsed `/projects/{id}/portal` for the project with a
+      real `active` decision ("The team will use REST for the new public
+      API.") extracted earlier this session — confirmed it renders
+      correctly with no approve/reject/edit controls anywhere on the page.
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**
