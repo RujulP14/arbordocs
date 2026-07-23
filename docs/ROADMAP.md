@@ -280,6 +280,42 @@ is checked off.
       `decider_notification_failed` is logged instead. Verified against
       the real Discord API (not just unit tests): sent a real DM to a real
       Discord account, confirmed received.
+- [x] **Verified-flag login gating (post-Phase-5, issue #16).** Any GitHub
+      user can now attempt login — a first-ever identity gets a pending
+      `User` row (`verified=False`) created instead of a bare rejection
+      with nothing to show for it, and is redirected to a clear "awaiting
+      approval" page instead of the old "not registered" message.
+      `User` gains a `verified: bool` column (migration
+      `0008_user_verified`, existing `is_admin=True` rows explicitly
+      backfilled to `verified=True`). `app/web/auth.py`'s `callback`
+      rewritten: creates the pending row on first sight of an unknown
+      `github_login`, then gates session creation on `verified OR
+      is_admin` — an existing admin approves a pending user by flipping
+      `verified=True` directly in Postgres (no new admin UI, per explicit
+      scope). `require_login`/`require_admin` (`app/web/deps.py`) needed
+      no changes — `verified` only gates session creation at login time,
+      not every subsequent request. `scripts/seed_admin.py` now sets
+      `verified=True` explicitly alongside `is_admin=True`.
+      [ADR-0006](decisions/0006-admin-authorization-in-db.md) updated in
+      place to describe this (a refinement of the same authorization
+      model, not a reversal), and corrected a pre-existing inaccuracy
+      (the ADR said lookup was by email; the real code has always used
+      `github_login`). 4 new tests in `tests/test_auth.py` (the project's
+      first auth test file, driving the real `/auth/github/login` →
+      `/callback` flow via `httpx.AsyncClient`'s cookie jar, with
+      `github_app_client`'s OAuth methods monkeypatched) cover: a new
+      identity creates a pending row and is denied a session; a repeat
+      pending login doesn't create a duplicate row; a verified non-admin
+      logs in successfully; an admin logs in successfully (regression).
+      Verified against real Postgres: created a real pending row through
+      the exact same code path `callback` uses, confirmed the login gate
+      correctly denies it, manually verified it via direct SQL (the real
+      approval mechanism), and confirmed the gate then allows it — full
+      pending→verified lifecycle proven against the real database. (A
+      live second-GitHub-account walkthrough of the OAuth HTTP flow itself
+      wasn't independently run — no second account was available — so
+      that exact path is covered by `tests/test_auth.py` rather than a
+      manual browser session.)
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**

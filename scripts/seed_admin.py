@@ -23,13 +23,14 @@ async def seed_admin(github_login: str, email: str | None) -> None:
         existing = await session.scalar(select(User).where(User.github_login == github_login))
         if existing:
             existing.is_admin = True
+            existing.verified = True
             if email:
                 existing.email = email
             await session.commit()
-            print(f"Updated existing user '{github_login}' -> is_admin=True")
+            print(f"Updated existing user '{github_login}' -> is_admin=True, verified=True")
             return
 
-        user = User(github_login=github_login, email=email, is_admin=True)
+        user = User(github_login=github_login, email=email, is_admin=True, verified=True)
         session.add(user)
         await session.commit()
         print(f"Created admin user '{github_login}' (id={user.id})")

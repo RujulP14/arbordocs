@@ -26,11 +26,22 @@ away.
   for why one GitHub App handles this). GitHub returns the user's identity
   (email/login).
 - **Authorization**: on successful OAuth callback, look up a `users` row by
-  email. If found and `is_admin = true`, create a session. If not found,
-  reject — no self-serve signup in v1.
+  `github_login`. If found and `is_admin = true` or `verified = true`,
+  create a session.
+- **Self-serve signup, revised**: a first-ever login from an unrecognized
+  `github_login` no longer just rejects — it creates a pending `users` row
+  (`verified = false`, `is_admin = false`) and redirects to a "pending
+  approval" page. No session is created for a pending user. An existing
+  admin approves a pending request by flipping `verified = true` directly
+  in Postgres — there is deliberately no in-app approval UI yet (see the
+  "verified" flag issue this ADR was updated for). This replaces the
+  original "no self-serve signup in v1, flatly reject unknown identities"
+  behavior: an account now always gets created on first login, it just
+  isn't usable until verified.
 - **Bootstrapping the first admin**: a one-time seed script
-  (`scripts/seed_admin.py` or a migration) inserts the first admin's email
-  with `is_admin = true` directly into Postgres. Run once, manually, by the
+  (`scripts/seed_admin.py` or a migration) inserts the first admin's
+  `github_login` with `is_admin = true` (and, since this update,
+  `verified = true`) directly into Postgres. Run once, manually, by the
   operator when standing up a new deployment. This is the only place an
   admin's identity is ever set outside the running app.
 - Future "invite another admin" functionality (out of scope for v1) would
@@ -41,9 +52,12 @@ away.
 - No `ADMIN_GITHUB_LOGINS` env var. Admin management is entirely DB state
   after the initial seed.
 - Adds a `users` table (`id`, `email`, `github_login`, `is_admin`,
-  `created_at`) to the Phase 1 schema, and a one-time seed step to the
-  deployment runbook — must happen before the first login attempt or it will
-  correctly fail closed.
+  `verified`, `created_at`) to the schema, and a one-time seed step to the
+  deployment runbook — must happen before the first login attempt or it
+  will correctly fail closed for that first admin.
+- A pending (unverified, non-admin) `users` row is now a normal, expected
+  state — not an error condition — for anyone who has attempted login but
+  not yet been approved.
 - Reinforces the general principle from ADR-0005: only ArborDocs' own
   bootstrap credentials (GitHub App keys, Discord bot token, DB connection
   string) live in `.env`; everything about specific admins, projects, repos,

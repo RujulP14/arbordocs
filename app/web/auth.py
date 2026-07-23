@@ -40,20 +40,28 @@ async def callback(request: Request, code: str, state: str) -> RedirectResponse:
 
     async with async_session() as db:
         user = await db.scalar(select(User).where(User.github_login == github_login))
+        if user is None:
+            # First-ever login from this identity — create a pending row
+            # (ADR-0006) rather than rejecting with nothing to show for it;
+            # an existing admin can flip `verified` once they recognize the
+            # request.
+            user = User(github_login=github_login, email=identity.get("email"))
+            db.add(user)
+            await db.commit()
 
-    if user is None or not user.is_admin:
-        # No self-serve signup (ADR-0006) — unknown or non-admin identities are rejected.
-        return RedirectResponse(f"/auth/github/denied?login={github_login}")
+        if not (user.verified or user.is_admin):
+            return RedirectResponse(f"/auth/github/pending?login={github_login}")
 
     request.session["user_id"] = str(user.id)
     return RedirectResponse("/projects")
 
 
-@router.get("/denied")
-async def denied(login: str = "") -> dict:
-    detail = "This GitHub account is not registered as an ArborDocs admin."
+@router.get("/pending")
+async def pending(login: str = "") -> dict:
+    detail = "Your ArborDocs account has been created and is awaiting approval."
     if login:
         detail += f" GitHub identity received: '{login}'."
+    detail += " Ask an existing admin to verify your account."
     return {"detail": detail}
 
 

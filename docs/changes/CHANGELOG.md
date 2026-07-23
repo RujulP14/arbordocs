@@ -5,6 +5,36 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Verified-flag login gating)
+- `User` gains a `verified: bool` column (migration `0008_user_verified`,
+  default `False`); existing `is_admin=True` rows explicitly backfilled to
+  `verified=True` in the same migration.
+- `app/web/auth.py`'s `callback` rewritten: a first-ever login from an
+  unrecognized `github_login` now creates a pending `User` row instead of
+  rejecting with no DB record — session creation is gated on
+  `verified OR is_admin`. Replaces the old `/denied` route with `/pending`,
+  which clearly explains the account was created and needs an existing
+  admin to verify it. `require_login`/`require_admin` (`app/web/deps.py`)
+  needed no changes — `verified` only gates session creation at login
+  time, not subsequent requests.
+- `scripts/seed_admin.py` now sets `verified=True` explicitly alongside
+  `is_admin=True`.
+- [ADR-0006](../decisions/0006-admin-authorization-in-db.md) updated in
+  place to describe the pending-row/verified-gating model — a refinement,
+  not a reversal — and corrected a pre-existing inaccuracy (the ADR said
+  lookup was by email; the real code has always used `github_login`).
+- `tests/test_auth.py` — the project's first auth test file, 4 tests
+  driving the real `/auth/github/login` → `/callback` flow via
+  `httpx.AsyncClient`'s cookie jar with `github_app_client`'s OAuth
+  methods monkeypatched: new identity creates a pending row and is denied
+  a session; repeat pending login doesn't duplicate the row; verified
+  non-admin login succeeds; admin login succeeds (regression).
+- Verified against real Postgres: created a real pending row through the
+  exact code path `callback` uses, confirmed the login gate denies it,
+  manually verified it via direct SQL (the real approval mechanism), and
+  confirmed the gate then allows it. Full test suite (85 tests) and `ruff
+  check`/`ruff format --check` both clean.
+
 ### Added (Discord DM notification to the decider)
 - `app/ingestion/discord/client.py` — `DiscordBotClient.send_dm(user_id,
   content)`, the client's first outbound capability (opens a DM channel via
