@@ -316,6 +316,42 @@ is checked off.
       wasn't independently run — no second account was available — so
       that exact path is covered by `tests/test_auth.py` rather than a
       manual browser session.)
+- [x] **Discord Thread ingestion + grouping (post-Phase-5, issue #11).**
+      Discord Threads were previously invisible to the pipeline entirely —
+      a Thread has its own `channel.id`, distinct from the channel it was
+      created in, so `_tracked_channel_ids()`/`on_message` silently dropped
+      every message posted inside one. `Message` gains a
+      `thread_starter_message_id` column (migration
+      `0009_thread_starter_message`, mirroring `reply_to_message_id`'s
+      shape exactly). `app/ingestion/discord/bot.py`'s `on_message` and
+      `on_reaction_add` now resolve tracking via a Thread's `parent_id`
+      instead of its own id; `_store_message` records
+      `thread_starter_message_id` (a Thread's own id equals its starter
+      message's id, per discord.py); `_backfill_tracked_channels` gained
+      `_backfill_channel_threads` to also backfill active + archived
+      thread history on bot startup, not just the parent channel's.
+      `app/pipeline/reconstruction.py`'s `assign_message_to_discussion_unit`
+      gained a new deterministic join check — a Thread message joins its
+      starter message's discussion unit directly, bypassing the similarity
+      threshold, exactly the way reply-chain already does (reply-chain
+      itself needed zero changes). Plain sequential messages remain an
+      explicit non-goal, unchanged — `reconstruction_similarity_threshold`
+      and the participant-continuity fallback are untouched. 1 new test in
+      `tests/test_reconstruction.py` (`test_thread_message_joins_starter_units_unit`,
+      mirroring the existing reply-chain test) confirms the join bypasses
+      similarity on deliberately dissimilar content; all 7 existing
+      reconstruction tests pass unchanged (regression check). Verified via
+      `eval/harness.py`: the interleaved-groups Stage 0 purity metric held
+      at 1.00 — no regression, as expected since this feature never
+      touches the similarity/participant fallback path. Verified against a
+      real Discord Thread (not just unit tests): posted a starter message
+      in a tracked channel, created a real Thread from it, and posted a
+      4-message decision conversation inside — confirmed in Postgres that
+      the starter message and all 4 thread messages share one
+      `discussion_unit_id`, the unit closed correctly on a ✅ reaction with
+      both real participants recorded, and the conversation extracted
+      through the full pipeline into a real `proposed` decision ("Cache
+      search results with a 5-minute TTL").
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**
