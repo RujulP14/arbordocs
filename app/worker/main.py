@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.db.models import Candidate, Decision, DiscussionUnit, GitHubInstallation, utcnow
 from app.db.session import async_session
+from app.pipeline.audit import log_event
 from app.pipeline.candidate_filter import score_unit
 from app.pipeline.extraction import extract_decision
 from app.pipeline.github_index import sync_repo_index
@@ -38,6 +39,14 @@ async def close_due_units() -> list[DiscussionUnit]:
             unit.closed_at = utcnow()
             unit.close_reason = "signal" if unit.signal_close_requested else "inactivity"
             closed.append(unit)
+            await log_event(
+                db,
+                unit.project_id,
+                "unit_closed",
+                "discussion_unit",
+                unit.id,
+                payload={"close_reason": unit.close_reason},
+            )
 
         await db.commit()
         for unit in closed:
@@ -52,6 +61,21 @@ async def run_candidate_filter(units: list[DiscussionUnit]) -> list[Candidate]:
         for unit in units:
             fresh_unit = await db.get(DiscussionUnit, unit.id)
             candidate = await score_unit(db, fresh_unit)
+            if candidate is not None:
+                await db.flush()
+                await log_event(
+                    db,
+                    candidate.project_id,
+                    "candidate_flagged",
+                    "candidate",
+                    candidate.id,
+                    payload={
+                        "score": candidate.score,
+                        "matched_keywords": candidate.matched_keywords,
+                        "embedding_score": candidate.embedding_score,
+                        "reaction_signal": candidate.reaction_signal,
+                    },
+                )
             await db.commit()
             if candidate is not None:
                 logger.info(
@@ -76,6 +100,28 @@ async def run_extraction(candidates: list[Candidate]) -> list[Decision]:
         for candidate in candidates:
             fresh_candidate = await db.get(Candidate, candidate.id)
             decision = await extract_decision(db, fresh_candidate)
+            if decision is not None:
+                await db.flush()
+                await log_event(
+                    db,
+                    decision.project_id,
+                    "decision_extracted",
+                    "decision",
+                    decision.id,
+                    payload={
+                        "statement": decision.statement,
+                        "type": decision.type,
+                        "confidence": decision.confidence,
+                    },
+                )
+            else:
+                await log_event(
+                    db,
+                    fresh_candidate.project_id,
+                    "decision_gated_out",
+                    "candidate",
+                    fresh_candidate.id,
+                )
             await db.commit()
             if decision is not None:
                 logger.info(
@@ -100,6 +146,20 @@ async def run_supersession(decisions: list[Decision]) -> None:
         for decision in decisions:
             fresh_decision = await db.get(Decision, decision.id)
             classifications = await classify_relationship(db, fresh_decision)
+            for c in classifications:
+                await log_event(
+                    db,
+                    fresh_decision.project_id,
+                    "supersession_classified",
+                    "decision",
+                    fresh_decision.id,
+                    payload={
+                        "existing_decision_id": str(c["existing_decision_id"]),
+                        "relationship": c["relationship"],
+                        "confidence": c["confidence"],
+                        "similarity": c["similarity"],
+                    },
+                )
             await db.commit()
             for c in classifications:
                 logger.info(
@@ -124,6 +184,15 @@ async def run_reconciliation(decisions: list[Decision]) -> None:
         for decision in decisions:
             fresh_decision = await db.get(Decision, decision.id)
             reconciliation = await reconcile_decision(db, fresh_decision)
+            if reconciliation is not None:
+                await log_event(
+                    db,
+                    fresh_decision.project_id,
+                    "reconciliation_computed",
+                    "decision",
+                    fresh_decision.id,
+                    payload=reconciliation,
+                )
             await db.commit()
             if reconciliation is not None:
                 logger.info(

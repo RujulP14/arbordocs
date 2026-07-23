@@ -5,6 +5,46 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Phase 5, piece 5 — audit ledger, Phase 5 complete)
+- New `AuditLogEntry` model + migration `0007_audit_log` — one unified,
+  append-only table (`event_type` discriminator) rather than per-stage
+  tables. `subject_type`/`subject_id` are a polymorphic reference (no FK
+  constraint); `actor` is a denormalized string (`"system"` or a user's
+  `github_login`) so the trail survives independent of the `User` row.
+  Indexes on `(project_id, created_at)` and `(subject_type, subject_id)`.
+- `app/pipeline/audit.py` — shared `log_event(db, project_id, event_type,
+  subject_type, subject_id, actor="system", payload=None)` helper; caller
+  owns the commit, matching every other pipeline function's shape.
+- Wired into all 5 pipeline mutation points in `app/worker/main.py`:
+  `close_due_units` (`unit_closed`), `run_candidate_filter`
+  (`candidate_flagged`), `run_extraction` (`decision_extracted` on success,
+  `decision_gated_out` on gate-out), `run_supersession`
+  (`supersession_classified`, logged even for `"unrelated"` results),
+  `run_reconciliation` (`reconciliation_computed`).
+- Wired into all 3 human-review actions in `app/web/decisions.py`:
+  `approve_decision`/`reject_decision`/`edit_decision` each capture the old
+  value(s) before mutating and log with `actor=user.github_login` — the
+  first record anywhere of *who* changed a decision's status.
+- `app/web/portal.py`/`portal_detail.html` — the portal detail page gained
+  a "History" section showing a decision's full chronological audit trail;
+  no new web surface was added for this.
+- `tests/test_audit_log.py` — 10 tests, one per pipeline call site,
+  exercising the real worker functions end-to-end via a monkeypatched
+  `async_session`. 5 more tests added to `tests/test_web_decisions.py`
+  (approve/reject/edit logging) and `tests/test_web_portal.py` (history
+  rendering).
+- Verified end-to-end against the real local Postgres DB: ran the real
+  `active` decision from piece 4 back through
+  `classify_relationship`/`reconcile_decision`, producing a real
+  `reconciliation_computed` row; reset it to `proposed` and approved it
+  through the live web UI, producing a real `decision_approved` row with
+  `actor="RujulP14"` — both render correctly, in order, on the portal's
+  History section. Full test suite (78 tests) and `ruff check`/`ruff
+  format --check` both clean.
+- **This completes Phase 5** — every component SPEC.md §4 scopes under it
+  (GitHub ingestion, reconciliation, human review, decision store +
+  portal, audit ledger) is now implemented and verified.
+
 ### Added (Phase 5, piece 4 — decision store + portal)
 - `app/web/portal.py` — read-only portal: `GET /projects/{id}/portal` lists
   `status="active"` decisions newest-first with optional `?type=`/`?scope=`

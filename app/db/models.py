@@ -270,3 +270,35 @@ class RepoDocument(Base):
     line_start: Mapped[int | None] = mapped_column(nullable=True)
     line_end: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class AuditLogEntry(Base):
+    """Append-only pipeline activity log (SPEC.md §4, ARCHITECTURE.md step
+    10) — "separates what changed from why the system proposed it."
+
+    Unified table rather than one per stage, matching this codebase's
+    established preference (`Candidate`'s signal-flag columns,
+    `RepoDocument`'s single `kind` discriminator). `subject_type`/
+    `subject_id` are a polymorphic reference (no FK constraint — the
+    subject can be a DiscussionUnit, Candidate, or Decision) rather than a
+    literal foreign key; `actor` is a denormalized string ("system" for
+    pipeline-driven entries, or a user's `github_login` for human-review
+    actions) so the trail survives even if the user row is later deleted.
+    """
+
+    __tablename__ = "audit_log_entries"
+    __table_args__ = (
+        Index("ix_audit_log_project_created", "project_id", "created_at"),
+        Index("ix_audit_log_subject", "subject_type", "subject_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    subject_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    subject_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    actor: Mapped[str] = mapped_column(String(255), default="system", nullable=False)
+    payload: Mapped[dict] = mapped_column(JsonColumn, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

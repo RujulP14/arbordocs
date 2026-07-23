@@ -93,7 +93,7 @@ is checked off.
       rotation policy) correctly scored below the similarity threshold and
       never reached the LLM at all — the retrieval-then-classify
       cost-control design working as intended.
-- [ ] **Phase 5 — GitHub ingestion + reconciliation (tier-b first) + human
+- [x] **Phase 5 — GitHub ingestion + reconciliation (tier-b first) + human
       review UI + decision store + portal + audit ledger.**
       This is the shippable v1 checkpoint.
       **Piece 1, GitHub content ingestion, done:** `app/pipeline/
@@ -221,6 +221,38 @@ is checked off.
       real `active` decision ("The team will use REST for the new public
       API.") extracted earlier this session — confirmed it renders
       correctly with no approve/reject/edit controls anywhere on the page.
+      **Piece 5, audit ledger, done — Phase 5 complete:** new unified
+      `AuditLogEntry` table (migration `0007_audit_log`) — one
+      `event_type`-discriminated table rather than per-stage tables,
+      matching the project's established unified-schema preference
+      (`Candidate`, `RepoDocument`). `subject_type`/`subject_id` are a
+      polymorphic reference (no FK — the subject can be a
+      `DiscussionUnit`/`Candidate`/`Decision`); `actor` is a denormalized
+      string (`"system"` for pipeline-driven entries, or the acting user's
+      `github_login` for human-review actions), so the trail survives
+      independent of the `User` row. New shared `app/pipeline/audit.py`'s
+      `log_event` helper, called from all 5 pipeline mutation points
+      (`close_due_units`, `run_candidate_filter`, `run_extraction` — both
+      the success and gate-out paths — `run_supersession`,
+      `run_reconciliation` in `app/worker/main.py`) and all 3 human-review
+      actions (`approve_decision`/`reject_decision`/`edit_decision` in
+      `app/web/decisions.py`, capturing old/new values and the acting
+      admin's `github_login`). The portal detail page
+      (`app/web/portal.py`/`portal_detail.html`) gained a "History"
+      section listing a decision's full chronological audit trail — no
+      new web surface invented for this. 10 unit tests in
+      `tests/test_audit_log.py` (one per pipeline call site, using a
+      monkeypatched `async_session` to exercise the real worker functions
+      end-to-end) plus 5 more added to `tests/test_web_decisions.py`/
+      `tests/test_web_portal.py` for the human-review and history-display
+      paths. Verified end-to-end against the real local Postgres DB: ran
+      the real `active` decision from piece 4 back through
+      `classify_relationship`/`reconcile_decision`, producing a real
+      `reconciliation_computed` audit row; reset it to `proposed` and
+      approved it through the live web UI, producing a real
+      `decision_approved` row with `actor="RujulP14"` (the real logged-in
+      GitHub identity) — both entries render correctly, in chronological
+      order, on the portal's History section.
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**

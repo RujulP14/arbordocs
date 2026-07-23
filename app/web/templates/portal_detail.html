@@ -92,6 +92,20 @@
           </li>
         </ul>
       </div>
+
+      <div class="card">
+        <p class="section-title">History</p>
+        <ul class="link-list">
+          {% for entry in audit_entries %}
+            <li>
+              <span class="badge">{{ entry.event_type }}</span>
+              {{ entry.actor }} — {{ entry.created_at.strftime("%b %d, %Y %H:%M") }}
+            </li>
+          {% else %}
+            <li class="empty">No recorded activity.</li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
 
     <div class="sidebar-card card">

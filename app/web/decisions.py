@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Decision, DiscordGuild, Message, Project, ProjectChannel, User
 from app.db.session import get_db
+from app.pipeline.audit import log_event
 from app.web.deps import require_admin, require_login
 from app.web.templating import templates
 
@@ -138,7 +139,17 @@ async def approve_decision(
     decision = await db.get(Decision, decision_id)
     if decision is None:
         raise HTTPException(status_code=404)
+    old_status = decision.status
     decision.status = "active"
+    await log_event(
+        db,
+        decision.project_id,
+        "decision_approved",
+        "decision",
+        decision.id,
+        actor=user.github_login,
+        payload={"old_status": old_status, "new_status": "active"},
+    )
     await db.commit()
     return RedirectResponse(f"/projects/{decision.project_id}/decisions", status_code=303)
 
@@ -152,7 +163,17 @@ async def reject_decision(
     decision = await db.get(Decision, decision_id)
     if decision is None:
         raise HTTPException(status_code=404)
+    old_status = decision.status
     decision.status = "rejected"
+    await log_event(
+        db,
+        decision.project_id,
+        "decision_rejected",
+        "decision",
+        decision.id,
+        actor=user.github_login,
+        payload={"old_status": old_status, "new_status": "rejected"},
+    )
     await db.commit()
     return RedirectResponse(f"/projects/{decision.project_id}/decisions", status_code=303)
 
@@ -168,7 +189,23 @@ async def edit_decision(
     decision = await db.get(Decision, decision_id)
     if decision is None:
         raise HTTPException(status_code=404)
+    old_statement = decision.statement
+    old_rationale = decision.rationale
     decision.statement = statement
     decision.rationale = rationale or None
+    await log_event(
+        db,
+        decision.project_id,
+        "decision_edited",
+        "decision",
+        decision.id,
+        actor=user.github_login,
+        payload={
+            "old_statement": old_statement,
+            "new_statement": statement,
+            "old_rationale": old_rationale,
+            "new_rationale": decision.rationale,
+        },
+    )
     await db.commit()
     return RedirectResponse(f"/projects/{decision.project_id}/decisions/{decision.id}", status_code=303)

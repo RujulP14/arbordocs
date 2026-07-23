@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.db.models import Decision, Project, User
+from app.db.models import AuditLogEntry, Decision, Project, User
 from app.db.session import get_db
 from app.web.deps import require_login
 from app.web.main import app
@@ -154,6 +154,32 @@ async def test_portal_detail_shows_reconciliation_and_supersession(client):
     assert "app/routes.py#list_users" in resp.text
     assert "docs/api.md#pagination" in resp.text
     assert "old decision" in resp.text
+
+
+async def test_portal_detail_shows_history(client):
+    ac, user, db_session = client
+    project = await _make_project(db_session, user)
+    decision = _decision(project.id)
+    db_session.add(decision)
+    await db_session.commit()
+
+    db_session.add(
+        AuditLogEntry(
+            project_id=project.id,
+            event_type="decision_approved",
+            subject_type="decision",
+            subject_id=decision.id,
+            actor="octocat",
+            payload={"old_status": "proposed", "new_status": "active"},
+        )
+    )
+    await db_session.commit()
+
+    resp = await ac.get(f"/projects/{project.id}/portal/{decision.id}")
+
+    assert resp.status_code == 200
+    assert "decision_approved" in resp.text
+    assert "octocat" in resp.text
 
 
 async def test_portal_detail_has_no_review_actions(client):
