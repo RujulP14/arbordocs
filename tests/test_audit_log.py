@@ -214,6 +214,124 @@ async def test_run_extraction_logs_decision_extracted(db_session, monkeypatch, f
     assert entries[0].payload["statement"] == "Use postgres for the database"
 
 
+async def _make_extractable_candidate(db_session, project, decider: str = "") -> Candidate:
+    unit = DiscussionUnit(
+        project_id=project.id, channel_id="chan-1", status="closed", participant_ids=["user-1", "user-2"]
+    )
+    db_session.add(unit)
+    await db_session.flush()
+    db_session.add(
+        Message(
+            project_id=project.id,
+            discussion_unit_id=unit.id,
+            channel_id="chan-1",
+            discord_message_id="msg-1",
+            author_id="user-1",
+            content="we decided to use postgres",
+            created_at=datetime.now(UTC),
+            reactions=[],
+        )
+    )
+    candidate = Candidate(project_id=project.id, discussion_unit_id=unit.id, score=1.0)
+    db_session.add(candidate)
+    await db_session.commit()
+    return candidate
+
+
+def _gate_response(decider: str = "") -> dict:
+    return {
+        "resolved": True,
+        "statement": "Use postgres for the database",
+        "type": "technical",
+        "scope": "",
+        "rationale": "",
+        "decider": decider,
+        "message_ids": ["msg-1"],
+        "confidence": 0.9,
+    }
+
+
+async def test_run_extraction_dms_decider_and_logs_decider_notified(
+    db_session, monkeypatch, fake_groq_client, fake_discord_client
+):
+    await _patch_worker_session(monkeypatch, db_session)
+    project = await _make_project(db_session)
+    candidate = await _make_extractable_candidate(db_session, project)
+
+    client = fake_groq_client([_gate_response(decider="user-1")])
+    monkeypatch.setitem(
+        extraction_module._PROVIDER_CALLERS, "groq", (extraction_module._call_groq, lambda: client)
+    )
+    discord_client = fake_discord_client()
+    monkeypatch.setattr(worker_main, "discord_bot_client", discord_client)
+
+    decisions = await worker_main.run_extraction([candidate])
+
+    assert len(decisions) == 1
+    assert discord_client.dm_calls == [
+        (
+            "user-1",
+            'ArborDocs noted this decision: "Use postgres for the database"\n'
+            f"http://localhost:8000/projects/{project.id}/portal/{decisions[0].id}",
+        )
+    ]
+    entries = await _audit_entries(db_session, decisions[0].id)
+    event_types = [e.event_type for e in entries]
+    assert "decider_notified" in event_types
+    notified_entry = next(e for e in entries if e.event_type == "decider_notified")
+    assert notified_entry.payload == {"decider": "user-1"}
+
+
+async def test_run_extraction_skips_dm_when_decider_empty(
+    db_session, monkeypatch, fake_groq_client, fake_discord_client
+):
+    await _patch_worker_session(monkeypatch, db_session)
+    project = await _make_project(db_session)
+    candidate = await _make_extractable_candidate(db_session, project)
+
+    client = fake_groq_client([_gate_response(decider="")])
+    monkeypatch.setitem(
+        extraction_module._PROVIDER_CALLERS, "groq", (extraction_module._call_groq, lambda: client)
+    )
+    discord_client = fake_discord_client()
+    monkeypatch.setattr(worker_main, "discord_bot_client", discord_client)
+
+    decisions = await worker_main.run_extraction([candidate])
+
+    assert len(decisions) == 1
+    assert discord_client.dm_calls == []
+    entries = await _audit_entries(db_session, decisions[0].id)
+    event_types = [e.event_type for e in entries]
+    assert "decider_notified" not in event_types
+    assert "decider_notification_failed" not in event_types
+
+
+async def test_run_extraction_logs_failure_and_continues_when_dm_raises(
+    db_session, monkeypatch, fake_groq_client, fake_discord_client
+):
+    await _patch_worker_session(monkeypatch, db_session)
+    project = await _make_project(db_session)
+    candidate = await _make_extractable_candidate(db_session, project)
+
+    client = fake_groq_client([_gate_response(decider="user-1")])
+    monkeypatch.setitem(
+        extraction_module._PROVIDER_CALLERS, "groq", (extraction_module._call_groq, lambda: client)
+    )
+    discord_client = fake_discord_client(should_fail=True)
+    monkeypatch.setattr(worker_main, "discord_bot_client", discord_client)
+
+    decisions = await worker_main.run_extraction([candidate])
+
+    assert len(decisions) == 1
+    assert decisions[0].statement == "Use postgres for the database"
+    entries = await _audit_entries(db_session, decisions[0].id)
+    event_types = [e.event_type for e in entries]
+    assert "decider_notification_failed" in event_types
+    assert "decider_notified" not in event_types
+    failed_entry = next(e for e in entries if e.event_type == "decider_notification_failed")
+    assert failed_entry.payload == {"decider": "user-1"}
+
+
 async def test_run_extraction_logs_decision_gated_out(db_session, monkeypatch, fake_groq_client):
     await _patch_worker_session(monkeypatch, db_session)
     project = await _make_project(db_session)
