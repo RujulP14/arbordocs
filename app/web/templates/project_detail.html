@@ -46,8 +46,11 @@
       <div class="card">
         <div class="list-rows">
           {% for decision in recent_decisions %}
-            {% set href = "/projects/" ~ project.id ~ ("/portal/" if decision.status == "active" else "/decisions/") ~ decision.id %}
-            <a class="list-row" href="{{ href }}">
+            {% if decision.status == "active" %}
+            <a class="list-row" href="/projects/{{ project.id }}/portal/{{ decision.id }}">
+            {% else %}
+            <a class="list-row" href="/projects/{{ project.id }}/decisions/{{ decision.id }}">
+            {% endif %}
               <div class="lr-main">
                 <div class="lr-title">{{ decision.statement }}</div>
                 <div class="lr-meta"><span>#{{ decision.channel_id }}</span><span>·</span><span>{{ decision.timestamp.strftime("%b %d, %Y") }}</span></div>
