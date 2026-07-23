@@ -1,21 +1,50 @@
 {% extends "base.html" %}
-{% block title %}Pick a repo — ArborDocs{% endblock %}
+{% block title %}Connect GitHub · ArborDocs{% endblock %}
 {% block content %}
-  <h1>Pick a repo for {{ project.name }}</h1>
+  <div class="breadcrumb">
+    <a href="/projects">Projects</a><span class="sep">/</span><a href="/projects/{{ project.id }}">{{ project.name }}</a><span class="sep">/</span><span>GitHub</span>
+  </div>
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>GitHub repository</h1>
+      <p class="sub">ArborDocs reconciles each decision against this repo's code and docs. One repository per project.</p>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <a href="/projects/{{ project.id }}">Decisions</a>
+    <a href="/integrations/github/connect/{{ project.id }}" class="active">GitHub</a>
+    <a href="/integrations/discord/connect/{{ project.id }}">Discord</a>
+  </nav>
+
   <form method="post" action="/integrations/github/attach/{{ project.id }}">
     <input type="hidden" name="installation_id" value="{{ installation_id }}">
-    <ul class="repo-picker">
-      {% for repo in repos %}
-        <li>
-          <label>
-            <input type="radio" name="repo_full_name" value="{{ repo.full_name }}" required>
-            {{ repo.full_name }}
+    <div class="card" style="margin-top:var(--sp-4)">
+      <div class="list-rows">
+        {% for repo in repos %}
+          <label class="list-row" style="cursor:pointer">
+            <input type="radio" name="repo_full_name" value="{{ repo.full_name }}" class="radio" style="margin-right:2px" required
+              {% if project.github_installation and project.github_installation.repo_full_name == repo.full_name %}checked{% endif %}>
+            <div class="lr-main">
+              <div class="lr-title mono">{{ repo.full_name }}</div>
+              <div class="lr-meta">
+                <span>{{ "Private" if repo.private else "Public" }}</span>
+                {% if repo.language %}<span>·</span><span>{{ repo.language }}</span>{% endif %}
+              </div>
+            </div>
+            {% if project.github_installation and project.github_installation.repo_full_name == repo.full_name %}
+              <div class="lr-side"><span class="badge badge-green"><span class="dot"></span>Currently connected</span></div>
+            {% endif %}
           </label>
-        </li>
-      {% else %}
-        <li class="empty">No repositories were granted to this installation.</li>
-      {% endfor %}
-    </ul>
-    <button type="submit">Attach repo</button>
+        {% else %}
+          <div class="empty-inline">No repositories were granted to this installation.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:var(--sp-6)">
+      <button class="btn btn-primary" type="submit">Save repository</button>
+      <a class="btn btn-ghost" href="/projects/{{ project.id }}">Cancel</a>
+    </div>
   </form>
 {% endblock %}

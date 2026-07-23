@@ -1,22 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Pick channels — ArborDocs{% endblock %}
+{% block title %}Connect Discord · ArborDocs{% endblock %}
 {% block content %}
-  <h1>Pick channels for {{ project.name }}</h1>
-  <p>Server: {{ guild.guild_name or guild.guild_id }}</p>
+  <div class="breadcrumb">
+    <a href="/projects">Projects</a><span class="sep">/</span><a href="/projects/{{ project.id }}">{{ project.name }}</a><span class="sep">/</span><span>Discord</span>
+  </div>
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>Discord channels</h1>
+      <p class="sub">ArborDocs reads new messages in the selected channels to extract decisions. It never posts or reads DMs.</p>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <a href="/projects/{{ project.id }}">Decisions</a>
+    <a href="/integrations/github/connect/{{ project.id }}">GitHub</a>
+    <a href="/integrations/discord/connect/{{ project.id }}" class="active">Discord</a>
+  </nav>
+
+  <div class="notice notice-accent" style="margin-bottom:var(--sp-6)">
+    <span>◇</span>
+    <div>Bot connected to server <strong>{{ guild.guild_name or guild.guild_id }}</strong>.</div>
+  </div>
+
   <form method="post" action="/integrations/discord/attach/{{ project.id }}">
     <input type="hidden" name="discord_guild_id" value="{{ guild.id }}">
-    <ul class="channel-picker">
-      {% for ch in channels %}
-        <li>
-          <label>
-            <input type="checkbox" name="channels" value="{{ ch.id }}|{{ ch.name }}">
-            #{{ ch.name }}
+    <h2 class="text-h3" style="margin-bottom:var(--sp-4)">Channels</h2>
+    <div class="card">
+      <div class="list-rows">
+        {% for ch in channels %}
+          <label class="list-row" style="cursor:pointer">
+            <input type="checkbox" name="channels" value="{{ ch.id }}|{{ ch.name }}" class="checkbox" style="margin-right:2px">
+            <div class="lr-main">
+              <div class="lr-title"># {{ ch.name }}</div>
+            </div>
           </label>
-        </li>
-      {% else %}
-        <li class="empty">No text channels found in this server.</li>
-      {% endfor %}
-    </ul>
-    <button type="submit">Attach channels</button>
+        {% else %}
+          <div class="empty-inline">No text channels found in this server.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:var(--sp-6)">
+      <button class="btn btn-primary" type="submit">Attach channels</button>
+      <a class="btn btn-ghost" href="/projects/{{ project.id }}">Cancel</a>
+    </div>
   </form>
 {% endblock %}

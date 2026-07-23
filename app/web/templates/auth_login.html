@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign in · ArborDocs{% endblock %}
+{% block content %}
+  <div class="auth-wrap">
+    <div class="auth-card stack-6">
+      <div style="text-align:center">
+        <h1 class="text-h1" style="margin-bottom:6px">Sign in to ArborDocs</h1>
+        <p class="muted text-sm">The changelog for the decisions your team makes in chat.</p>
+      </div>
+
+      <div class="card card-pad stack-4">
+        <a class="btn btn-github btn-lg btn-block" href="/auth/github/start"><span class="g">⑂</span> Continue with GitHub</a>
+        <p class="text-xs subtle" style="text-align:center;margin:0">
+          ArborDocs uses your GitHub identity to sign in and to connect repositories. We request read access to the repos you choose — nothing else.
+        </p>
+      </div>
+
+      <p class="text-xs subtle" style="text-align:center">
+        New here? Signing in creates your account, then an admin verifies it before you get access.
+      </p>
+    </div>
+  </div>
+{% endblock %}

@@ -34,7 +34,7 @@ async def test_new_login_creates_pending_user_and_redirects_to_pending(client):
     ac, db_session, monkeypatch = client
     _set_identity(monkeypatch, "newperson")
 
-    login_resp = await ac.get("/auth/github/login", follow_redirects=False)
+    login_resp = await ac.get("/auth/github/start", follow_redirects=False)
     redirect_url = login_resp.headers["location"]
     state = redirect_url.split("state=")[1]
 
@@ -63,7 +63,7 @@ async def test_repeat_pending_login_does_not_create_duplicate_row(client):
     _set_identity(monkeypatch, "stillpending")
 
     for _ in range(2):
-        login_resp = await ac.get("/auth/github/login", follow_redirects=False)
+        login_resp = await ac.get("/auth/github/start", follow_redirects=False)
         state = login_resp.headers["location"].split("state=")[1]
         callback_resp = await ac.get(
             "/auth/github/callback",
@@ -82,7 +82,7 @@ async def test_verified_non_admin_login_succeeds(client):
     db_session.add(User(github_login="verifieduser", is_admin=False, verified=True))
     await db_session.commit()
 
-    login_resp = await ac.get("/auth/github/login", follow_redirects=False)
+    login_resp = await ac.get("/auth/github/start", follow_redirects=False)
     state = login_resp.headers["location"].split("state=")[1]
     callback_resp = await ac.get(
         "/auth/github/callback",
@@ -100,7 +100,7 @@ async def test_admin_login_succeeds(client):
     db_session.add(User(github_login="adminuser", is_admin=True, verified=True))
     await db_session.commit()
 
-    login_resp = await ac.get("/auth/github/login", follow_redirects=False)
+    login_resp = await ac.get("/auth/github/start", follow_redirects=False)
     state = login_resp.headers["location"].split("state=")[1]
     callback_resp = await ac.get(
         "/auth/github/callback",

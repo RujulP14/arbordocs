@@ -1,21 +1,52 @@
 {% extends "base.html" %}
 {% block title %}Projects — ArborDocs{% endblock %}
 {% block content %}
-  <h1>Projects</h1>
-
-  <form method="post" action="/projects" class="new-project-form">
-    <input type="text" name="name" placeholder="Project name" required>
-    <input type="text" name="description" placeholder="Description (optional)">
-    <button type="submit">Create project</button>
-  </form>
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>Projects</h1>
+      <p class="sub">Each project pairs one GitHub repository with the Discord channels ArborDocs watches for decisions.</p>
+    </div>
+    <div class="page-head-actions">
+      <a class="btn btn-primary" href="#new"><span>＋</span> New project</a>
+    </div>
+  </div>
 
   <div class="card">
-    <ul class="project-list">
+    <div class="list-rows">
       {% for project in projects %}
-        <li><a href="/projects/{{ project.id }}">{{ project.name }}</a></li>
+        <a class="list-row" href="/projects/{{ project.id }}">
+          <div class="lr-main">
+            <div class="lr-title">{{ project.name }}</div>
+            {% if project.description %}<div class="lr-meta">{{ project.description }}</div>{% endif %}
+          </div>
+          <div class="lr-side">
+            {% set c = counts.get(project.id, {"proposed": 0, "active": 0}) %}
+            {% if c.proposed %}<span class="badge badge-amber"><span class="dot"></span>{{ c.proposed }} proposed</span>{% endif %}
+            {% if c.active %}<span class="badge badge-green"><span class="dot"></span>{{ c.active }} active</span>{% endif %}
+            <span class="chev">›</span>
+          </div>
+        </a>
       {% else %}
-        <li class="empty">No projects yet — create one above.</li>
+        <div class="empty-inline">No projects yet — create one below.</div>
       {% endfor %}
-    </ul>
+    </div>
   </div>
+
+  <div class="section-hd" id="new"><h2>Create a project</h2><span class="line"></span></div>
+  <form class="card card-pad" method="post" action="/projects">
+    <div class="grid grid-2">
+      <div class="field">
+        <label for="name">Project name</label>
+        <input class="input" id="name" name="name" type="text" placeholder="e.g. Billing Service" required>
+      </div>
+      <div class="field">
+        <label for="description">Description</label>
+        <input class="input" id="description" name="description" type="text" placeholder="Optional">
+      </div>
+    </div>
+    <div class="row" style="margin-top:var(--sp-5)">
+      <button class="btn btn-primary" type="submit">Create project</button>
+      <span class="text-xs subtle">You'll connect GitHub and Discord in the next step.</span>
+    </div>
+  </form>
 {% endblock %}

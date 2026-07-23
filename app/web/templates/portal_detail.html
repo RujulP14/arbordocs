@@ -1,121 +1,181 @@
 {% extends "base.html" %}
 {% block title %}Decision — {{ project.name }}{% endblock %}
+{% block nav %}
+  <a href="/projects">Projects</a>
+  <a href="/projects/{{ project.id }}/portal" class="active">Portal</a>
+{% endblock %}
 {% block content %}
-  <a href="/projects/{{ project.id }}/portal" class="back-link">← Decisions</a>
+  {% set status_badge = {"proposed": "badge-amber", "active": "badge-green", "rejected": "badge-red", "superseded": "badge-gray"} %}
+  {% set recon_badge = {"consistent": "badge-green", "contradiction": "badge-red", "unverified": "badge-gray"} %}
 
-  <div class="decision-header">
-    <div class="statement-block">
-      <span class="badge">{{ decision.type }}</span>
-      <span class="badge badge-confidence">confidence {{ "%.0f"|format(decision.confidence * 100) }}%</span>
-      <h1 class="decision-title">{{ decision.statement }}</h1>
-    </div>
-    <span class="status-pill badge-status-{{ decision.status }}">{{ decision.status }}</span>
+  <div class="notice" style="margin-bottom:var(--sp-6)">
+    <span>🔒</span><span class="text-sm">Read-only. This is the team's record — to change a decision, propose a new one in chat and approve it in the review queue.</span>
   </div>
 
-  <div class="decision-layout">
-    <div class="main-column">
+  <div class="breadcrumb">
+    <a href="/projects/{{ project.id }}/portal">Portal</a><span class="sep">/</span><span>{{ decision.id }}</span>
+  </div>
+
+  <div class="detail-layout">
+    <div class="detail-main stack-6">
+      <div>
+        <div class="row" style="margin-bottom:var(--sp-4)">
+          <span class="badge {{ status_badge.get(decision.status, 'badge-gray') }}"><span class="dot"></span>{{ decision.status|capitalize }}</span>
+          {% if decision.reconciliation %}
+            <span class="badge badge-recon {{ recon_badge.get(decision.reconciliation.state, 'badge-gray') }}">{{ decision.reconciliation.state|capitalize }}</span>
+          {% endif %}
+          <span class="tag-mono">{{ decision.id }}</span>
+        </div>
+        <blockquote class="statement">{{ decision.statement }}</blockquote>
+      </div>
+
       <div class="card">
-        <p class="section-title">Details</p>
-        <dl class="field-grid">
-          <dt>Scope</dt><dd>{{ decision.scope or "—" }}</dd>
-          <dt>Rationale</dt><dd>{{ decision.rationale or "—" }}</dd>
-          <dt>Decider</dt><dd>{{ decision.decider or "—" }}</dd>
-          <dt>Participants</dt><dd>{{ decision.participants|join(", ") if decision.participants else "—" }}</dd>
+        <div class="card-hd"><h3>Details</h3></div>
+        <div class="card-bd">
+          <dl class="meta-list">
+            <dt>Type</dt><dd>{{ decision.type }}</dd>
+            <dt>Scope</dt><dd>{{ decision.scope or "—" }}</dd>
+            <dt>Rationale</dt><dd>{{ decision.rationale or "—" }}</dd>
+            <dt>Decider</dt><dd>{{ decision.decider or "—" }}</dd>
+            <dt>Participants</dt><dd>{{ decision.participants|join(", ") if decision.participants else "—" }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>Source transcript</h3><span class="tag-mono">#{{ decision.channel_id }}</span></div>
+        <div class="card-bd">
+          <div class="transcript">
+            {% for link in message_links %}
+              {% if link.message %}
+                <div class="msg">
+                  <span class="avatar">{{ (link.message.author_name or link.message.author_id)[:2]|upper }}</span>
+                  <div class="msg-body">
+                    <div class="msg-head">
+                      <span class="msg-author">{{ link.message.author_name or link.message.author_id }}</span>
+                      <span class="msg-time">{{ link.message.created_at.strftime("%b %d, %Y %H:%M") }}</span>
+                      {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="text-xs" style="margin-left:auto">Open in Discord ↗</a>{% endif %}
+                    </div>
+                    <div class="msg-text">{{ link.message.content }}</div>
+                  </div>
+                </div>
+              {% else %}
+                <div class="msg">
+                  <div class="msg-body">
+                    <div class="msg-head">
+                      <span class="msg-author subtle">Unknown message</span>
+                      {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="text-xs" style="margin-left:auto">Open in Discord ↗</a>{% endif %}
+                    </div>
+                    <div class="msg-text subtle" style="font-style:italic">Message {{ link.id }} was not found (may have been deleted).</div>
+                  </div>
+                </div>
+              {% endif %}
+            {% else %}
+              <div class="empty-inline">No source messages recorded.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <h3>Reconciliation against the repo</h3>
+          {% if decision.reconciliation %}
+            <span class="badge {{ recon_badge.get(decision.reconciliation.state, 'badge-gray') }}">{{ decision.reconciliation.state|capitalize }}</span>
+          {% endif %}
+        </div>
+        <div class="card-bd stack-4">
+          {% if decision.reconciliation %}
+            <p class="text-sm muted">Related files surfaced by embedding similarity, for a human to eyeball.</p>
+            <div>
+              <p class="uppercase-label" style="margin-bottom:var(--sp-2)">Related code</p>
+              <div class="path-list">
+                {% for path in decision.reconciliation.related_code %}
+                  <div class="path-item"><span class="g">›</span><span>{{ path }}</span></div>
+                {% else %}
+                  <div class="path-empty">None found.</div>
+                {% endfor %}
+              </div>
+            </div>
+            <div>
+              <p class="uppercase-label" style="margin-bottom:var(--sp-2)">Related docs</p>
+              <div class="path-list">
+                {% for path in decision.reconciliation.related_docs %}
+                  <div class="path-item"><span class="g">›</span><span>{{ path }}</span></div>
+                {% else %}
+                  <div class="path-empty">None found.</div>
+                {% endfor %}
+              </div>
+            </div>
+          {% else %}
+            <p class="text-sm subtle" style="font-style:italic">Not yet reconciled.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>Supersession</h3></div>
+        <div class="card-bd stack-3">
+          {% if supersedes %}
+            <a class="link-row" href="/projects/{{ project.id }}/portal/{{ supersedes.id }}">
+              <span class="lk-label">Supersedes</span><span class="text-sm">{{ supersedes.statement }}</span>
+            </a>
+          {% else %}
+            <div class="link-row" style="cursor:default">
+              <span class="lk-label">Supersedes</span><span class="text-sm subtle">Nothing — this is a first-of-kind decision.</span>
+            </div>
+          {% endif %}
+          {% if superseded_by %}
+            <a class="link-row" href="/projects/{{ project.id }}/portal/{{ superseded_by.id }}">
+              <span class="lk-label">Superseded by</span><span class="text-sm">{{ superseded_by.statement }}</span>
+            </a>
+          {% else %}
+            <div class="link-row" style="cursor:default">
+              <span class="lk-label">Superseded by</span><span class="text-sm subtle">Nothing — this decision is current.</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h3>History</h3><span class="text-xs subtle">Full audit log · oldest first</span></div>
+        <div class="card-bd">
+          <div class="audit">
+            {% for entry in audit_entries %}
+              <div class="audit-item">
+                <span class="audit-dot {{ 'accent' if entry.actor != 'system' else '' }}"></span>
+                <div class="audit-body">
+                  <div class="audit-line"><span class="ev">{{ entry.event_type }}</span></div>
+                  <div class="audit-meta">
+                    {% if entry.actor == 'system' %}<span class="actor-system">system</span>{% else %}<span class="avatar" style="width:18px;height:18px;font-size:9px">{{ entry.actor[:2]|upper }}</span><span>{{ entry.actor }}</span>{% endif %}
+                    <span>·</span><span>{{ entry.created_at.strftime("%b %d, %Y · %H:%M UTC") }}</span>
+                  </div>
+                </div>
+              </div>
+            {% else %}
+              <div class="empty-inline">No recorded activity.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="detail-side">
+      <div class="card card-pad stack-3">
+        <div class="row between">
+          <span class="uppercase-label">Status</span>
+          <span class="badge {{ status_badge.get(decision.status, 'badge-gray') }}"><span class="dot"></span>{{ decision.status|capitalize }}</span>
+        </div>
+        <p class="text-xs subtle" style="margin:0">This decision is part of the team's record and can't be edited here.</p>
+      </div>
+      <div class="card card-pad">
+        <p class="uppercase-label" style="margin-bottom:var(--sp-3)">Metadata</p>
+        <dl class="meta-list">
+          <dt>Authority</dt><dd>{{ decision.authority_tier }}</dd>
+          <dt>Channel</dt><dd>#{{ decision.channel_id }}</dd>
+          <dt>Decided</dt><dd>{{ decision.timestamp.strftime("%b %d, %Y") }}</dd>
         </dl>
       </div>
-
-      <div class="card">
-        <p class="section-title">Source messages</p>
-        <ul class="transcript">
-          {% for link in message_links %}
-            <li class="transcript-message">
-              {% if link.message %}
-                <div class="transcript-meta">
-                  <span class="transcript-author">{{ link.message.author_name or link.message.author_id }}</span>
-                  <span class="transcript-time">{{ link.message.created_at.strftime("%b %d, %Y %H:%M") }}</span>
-                  {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="transcript-link">↗</a>{% endif %}
-                </div>
-                <div class="transcript-content">{{ link.message.content }}</div>
-              {% else %}
-                <div class="transcript-meta">
-                  <span class="transcript-author">Unknown message</span>
-                  {% if link.has_link %}<a href="/decisions/{{ decision.id }}/messages/{{ link.id }}/open" target="_blank" class="transcript-link">↗</a>{% endif %}
-                </div>
-                <div class="transcript-content empty">Message {{ link.id }} was not found (may have been deleted).</div>
-              {% endif %}
-            </li>
-          {% else %}
-            <li class="empty">No source messages recorded.</li>
-          {% endfor %}
-        </ul>
-      </div>
-
-      <div class="card">
-        <p class="section-title">Reconciliation</p>
-        {% if decision.reconciliation %}
-          <p><span class="badge">{{ decision.reconciliation.state }}</span></p>
-          <h3>Related code</h3>
-          <ul class="related-list">
-            {% for path in decision.reconciliation.related_code %}
-              <li>{{ path }}</li>
-            {% else %}
-              <li class="empty" style="padding: 0.4rem 0.6rem;">None found.</li>
-            {% endfor %}
-          </ul>
-          <h3>Related docs</h3>
-          <ul class="related-list">
-            {% for path in decision.reconciliation.related_docs %}
-              <li>{{ path }}</li>
-            {% else %}
-              <li class="empty" style="padding: 0.4rem 0.6rem;">None found.</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p class="empty">Not yet reconciled.</p>
-        {% endif %}
-      </div>
-
-      <div class="card">
-        <p class="section-title">Supersession</p>
-        <ul class="link-list">
-          <li>
-            Supersedes:
-            {% if supersedes %}
-              <a href="/projects/{{ project.id }}/portal/{{ supersedes.id }}">{{ supersedes.statement }}</a>
-            {% else %}—{% endif %}
-          </li>
-          <li>
-            Superseded by:
-            {% if superseded_by %}
-              <a href="/projects/{{ project.id }}/portal/{{ superseded_by.id }}">{{ superseded_by.statement }}</a>
-            {% else %}—{% endif %}
-          </li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <p class="section-title">History</p>
-        <ul class="link-list">
-          {% for entry in audit_entries %}
-            <li>
-              <span class="badge">{{ entry.event_type }}</span>
-              {{ entry.actor }} — {{ entry.created_at.strftime("%b %d, %Y %H:%M") }}
-            </li>
-          {% else %}
-            <li class="empty">No recorded activity.</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-
-    <div class="sidebar-card card">
-      <h2>Details</h2>
-      <ul class="meta-list">
-        <li><span class="meta-key">Status</span><span class="meta-val">{{ decision.status }}</span></li>
-        <li><span class="meta-key">Authority</span><span class="meta-val">{{ decision.authority_tier }}</span></li>
-        <li><span class="meta-key">Channel</span><span class="meta-val">{{ decision.channel_id }}</span></li>
-        <li><span class="meta-key">Decided</span><span class="meta-val">{{ decision.timestamp.strftime("%b %d, %Y") }}</span></li>
-      </ul>
-    </div>
+    </aside>
   </div>
 {% endblock %}
