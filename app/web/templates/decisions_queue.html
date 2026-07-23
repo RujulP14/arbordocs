@@ -1,23 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Review decisions — {{ project.name }}{% endblock %}
+{% block title %}Review queue — {{ project.name }}{% endblock %}
 {% block content %}
-  <a href="/projects/{{ project.id }}" class="back-link">← {{ project.name }}</a>
-  <h1>Review decisions</h1>
-  <p style="color: var(--text-muted); margin-top: -0.25rem;">
-    Decisions extracted from Discord that are waiting for your approval before they go live.
-  </p>
+  <div class="breadcrumb">
+    <a href="/projects">Projects</a><span class="sep">/</span><a href="/projects/{{ project.id }}">{{ project.name }}</a><span class="sep">/</span><span>Review queue</span>
+  </div>
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>Review queue</h1>
+      <p class="sub">Proposed decisions extracted from chat. Approve to publish to the portal, or reject to discard.</p>
+    </div>
+  </div>
 
-  <ul class="decision-list">
-    {% for decision in decisions %}
-      <li>
-        <a class="decision-row" href="/projects/{{ project.id }}/decisions/{{ decision.id }}">
-          <span class="statement">{{ decision.statement }}</span>
-          <span class="badge">{{ decision.type }}</span>
-          <span class="badge badge-confidence">confidence {{ "%.0f"|format(decision.confidence * 100) }}%</span>
-        </a>
-      </li>
-    {% else %}
-      <li class="empty">No decisions awaiting review.</li>
-    {% endfor %}
-  </ul>
+  <div class="card">
+    <div class="list-rows">
+      {% for decision in decisions %}
+        <div class="list-row">
+          <a class="lr-main" href="/projects/{{ project.id }}/decisions/{{ decision.id }}" style="text-decoration:none;color:inherit">
+            <div class="lr-title">{{ decision.statement }}</div>
+            <div class="lr-meta"><span>#{{ decision.channel_id }}</span><span>·</span><span>{{ "%.0f"|format(decision.confidence * 100) }}% confidence</span></div>
+          </a>
+          <div class="lr-side">
+            {% if decision.reconciliation %}
+              <span class="badge badge-recon badge-gray">{{ decision.reconciliation.state|capitalize }}</span>
+            {% else %}
+              <span class="badge badge-recon" style="border-style:dashed">Not reconciled</span>
+            {% endif %}
+            <form method="post" action="/decisions/{{ decision.id }}/approve" style="display:inline"><button class="btn btn-secondary btn-sm" type="submit">Approve</button></form>
+            <a class="btn btn-ghost btn-sm" href="/projects/{{ project.id }}/decisions/{{ decision.id }}">Review ›</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="empty-inline">No decisions awaiting review.</div>
+      {% endfor %}
+    </div>
+  </div>
+  <p class="text-xs subtle" style="margin-top:var(--sp-4)">Showing {{ decisions|length }} proposed decision{{ "s" if decisions|length != 1 else "" }}.</p>
 {% endblock %}

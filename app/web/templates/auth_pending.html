@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Pending approval · ArborDocs{% endblock %}
+{% block content %}
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="card card-pad" style="text-align:center">
+        <div class="glyph-lg">◷</div>
+        <h1 class="text-h2" style="margin-bottom:8px">Your account is pending approval</h1>
+        <p class="muted text-sm" style="margin-bottom:var(--sp-5)">
+          {% if login %}Thanks, <strong>{{ login }}</strong> — your{% else %}Your{% endif %}
+          ArborDocs account has been created and is awaiting approval. Ask an existing admin to verify your account.
+        </p>
+      </div>
+      <p class="text-xs subtle" style="text-align:center;margin-top:var(--sp-4)">Think this is a mistake? <a href="/support">Contact support</a>.</p>
+    </div>
+  </div>
+{% endblock %}

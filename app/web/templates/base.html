@@ -1,23 +1,44 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}ArborDocs{% endblock %}</title>
   <script src="https://unpkg.com/htmx.org@2.0.3"></script>
   <link rel="stylesheet" href="/static/style.css">
+  <script>
+    (function () { var t = localStorage.getItem('arbordocs-theme'); if (t) document.documentElement.dataset.theme = t; })();
+    function toggleTheme() { var d = document.documentElement; var n = d.dataset.theme === 'dark' ? 'light' : 'dark'; d.dataset.theme = n; localStorage.setItem('arbordocs-theme', n); }
+  </script>
 </head>
 <body>
-  <header>
-    <a href="/projects" class="brand">ArborDocs</a>
-    {% if user %}
-      <span class="user">{{ user.github_login }}</span>
-      <form method="post" action="/auth/github/logout">
-        <button type="submit">Log out</button>
-      </form>
-    {% endif %}
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="{% block brand_href %}/projects{% endblock %}" class="brand">Arbor<span class="brand-dot">Docs</span></a>
+      <nav class="topnav">
+        {% block nav %}<a href="/projects">Projects</a>{% endblock %}
+      </nav>
+      <div class="topbar-right">
+        <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">◐</button>
+        {% block topbar_right %}
+          {% if user %}
+            <span class="user-chip">
+              <span class="avatar">{{ user.github_login[:2]|upper }}</span>
+              {{ user.github_login }}
+            </span>
+            <form method="post" action="/auth/github/logout">
+              <button type="submit" class="btn btn-ghost btn-sm">Log out</button>
+            </form>
+          {% else %}
+            <a class="btn btn-ghost btn-sm" href="/auth/github/login">Sign in</a>
+            <a class="btn btn-primary btn-sm" href="/auth/github/login">Get started</a>
+          {% endif %}
+        {% endblock %}
+      </div>
+    </div>
   </header>
-  <main>
-    {% block content %}{% endblock %}
+  <main class="page">
+    {% block main %}<div class="container">{% block content %}{% endblock %}</div>{% endblock %}
   </main>
 </body>
 </html>

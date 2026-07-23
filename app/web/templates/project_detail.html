@@ -1,38 +1,107 @@
 {% extends "base.html" %}
 {% block title %}{{ project.name }} — ArborDocs{% endblock %}
 {% block content %}
-  <a href="/projects" class="back-link">← Projects</a>
-  <h1>{{ project.name }}</h1>
-  {% if project.description %}<p style="color: var(--text-muted); margin-top: -0.25rem;">{{ project.description }}</p>{% endif %}
+  {% set status_badge = {"proposed": "badge-amber", "active": "badge-green", "rejected": "badge-red", "superseded": "badge-gray"} %}
 
-  <div class="card">
-    <h2>Decisions</h2>
-    <a href="/projects/{{ project.id }}/decisions" class="button">Review decisions</a>
-    <a href="/projects/{{ project.id }}/portal" class="button button-secondary">View portal</a>
+  <div class="breadcrumb">
+    <a href="/projects">Projects</a><span class="sep">/</span><span>{{ project.name }}</span>
+  </div>
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>{{ project.name }}</h1>
+      <p class="sub">
+        {% if project.github_installation %}<span class="mono">{{ project.github_installation.repo_full_name }}</span> · {% endif %}
+        {{ project.channels|length }} Discord channel{{ "s" if project.channels|length != 1 else "" }} ·
+        {{ proposed_count + active_count }} decisions tracked
+      </p>
+    </div>
+    <div class="page-head-actions">
+      <a class="btn btn-secondary" href="/projects/{{ project.id }}/portal">View portal</a>
+      <a class="btn btn-primary" href="/projects/{{ project.id }}/decisions">Review queue{% if proposed_count %} <span class="count-pill" style="background:oklch(1 0 0 / .22);color:inherit">{{ proposed_count }}</span>{% endif %}</a>
+    </div>
   </div>
 
-  <div class="card">
-    <h2>GitHub</h2>
-    {% if project.github_installation %}
-      <p>Connected: <code>{{ project.github_installation.repo_full_name }}</code></p>
-      <a href="/integrations/github/connect/{{ project.id }}" class="button button-secondary">Change repo</a>
-    {% else %}
-      <a href="/integrations/github/connect/{{ project.id }}" class="button">Connect GitHub</a>
-    {% endif %}
-  </div>
+  <nav class="tabs">
+    <a href="/projects/{{ project.id }}" class="active">Decisions</a>
+    <a href="/integrations/github/connect/{{ project.id }}">GitHub</a>
+    <a href="/integrations/discord/connect/{{ project.id }}">Discord</a>
+  </nav>
 
-  <div class="card">
-    <h2>Discord channels</h2>
-    {% if project.channels %}
-      <ul class="channel-picker">
-        {% for ch in project.channels %}
-          <li>
-            #{{ ch.channel_name or ch.channel_id }}
-            {% include "_channel_tier.html" %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-    <a href="/integrations/discord/connect/{{ project.id }}" class="button">Add to Discord</a>
+  {% if proposed_count %}
+    <div class="notice notice-amber" style="margin-bottom:var(--sp-6)">
+      <span>◷</span>
+      <div>
+        <strong>{{ proposed_count }} decision{{ "s are" if proposed_count != 1 else " is" }} waiting for review.</strong> They stay out of the portal until an admin approves them.
+        <a href="/projects/{{ project.id }}/decisions" style="margin-left:6px">Open review queue →</a>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="detail-layout">
+    <div class="detail-main">
+      <div class="row between" style="margin-bottom:var(--sp-4)">
+        <h2 class="text-h3">Recent decisions</h2>
+        <a class="text-sm" href="/projects/{{ project.id }}/portal">See all active →</a>
+      </div>
+      <div class="card">
+        <div class="list-rows">
+          {% for decision in recent_decisions %}
+            {% if decision.status == "active" %}
+            <a class="list-row" href="/projects/{{ project.id }}/portal/{{ decision.id }}">
+            {% else %}
+            <a class="list-row" href="/projects/{{ project.id }}/decisions/{{ decision.id }}">
+            {% endif %}
+              <div class="lr-main">
+                <div class="lr-title">{{ decision.statement }}</div>
+                <div class="lr-meta"><span>#{{ decision.channel_id }}</span><span>·</span><span>{{ decision.timestamp.strftime("%b %d, %Y") }}</span></div>
+              </div>
+              <div class="lr-side">
+                {% if decision.reconciliation %}<span class="badge badge-recon badge-gray">{{ decision.reconciliation.state|capitalize }}</span>{% endif %}
+                <span class="badge {{ status_badge.get(decision.status, 'badge-gray') }}"><span class="dot"></span>{{ decision.status|capitalize }}</span>
+              </div>
+            </a>
+          {% else %}
+            <div class="empty-inline">No decisions yet — they'll appear here once ArborDocs extracts them from Discord.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <aside class="detail-side">
+      <div class="card card-pad">
+        <p class="uppercase-label" style="margin-bottom:var(--sp-3)">Integrations</p>
+        <div class="stack-3">
+          <div class="row between">
+            <div class="hstack-tight"><span>⑂</span><span class="text-sm">GitHub</span></div>
+            {% if project.github_installation %}
+              <span class="badge badge-green"><span class="dot"></span>Connected</span>
+            {% else %}
+              <a class="btn btn-secondary btn-sm" href="/integrations/github/connect/{{ project.id }}">Connect</a>
+            {% endif %}
+          </div>
+          {% if project.github_installation %}<div class="mono text-xs subtle">{{ project.github_installation.repo_full_name }}</div>{% endif %}
+          <div class="divider"></div>
+          <div class="row between">
+            <div class="hstack-tight"><span>◇</span><span class="text-sm">Discord</span></div>
+            {% if project.channels %}
+              <span class="badge badge-green"><span class="dot"></span>{{ project.channels|length }} channel{{ "s" if project.channels|length != 1 else "" }}</span>
+            {% else %}
+              <a class="btn btn-secondary btn-sm" href="/integrations/discord/connect/{{ project.id }}">Connect</a>
+            {% endif %}
+          </div>
+          {% if project.channels %}<div class="text-xs subtle">{% for ch in project.channels %}#{{ ch.channel_name or ch.channel_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+        </div>
+      </div>
+      <div class="card card-pad">
+        <p class="uppercase-label" style="margin-bottom:var(--sp-3)">This project</p>
+        <dl class="meta-list">
+          <dt>Decisions</dt><dd>{{ proposed_count + active_count }} total</dd>
+          <dt>Active</dt><dd>{{ active_count }}</dd>
+          <dt>Proposed</dt><dd>{{ proposed_count }}</dd>
+          <dt>Created</dt><dd>{{ project.created_at.strftime("%b %d, %Y") }}</dd>
+        </dl>
+      </div>
+      <a class="btn btn-secondary btn-block" href="/projects/{{ project.id }}/portal">Open decision portal</a>
+    </aside>
   </div>
 {% endblock %}

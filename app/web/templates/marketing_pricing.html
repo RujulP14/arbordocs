@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Pricing · ArborDocs{% endblock %}
+{% block brand_href %}/{% endblock %}
+{% block nav %}
+  <a href="/">Product</a>
+  <a href="/pricing" class="active">Pricing</a>
+  <a href="/support">Support</a>
+{% endblock %}
+{% block main %}
+  <section class="container" style="padding-top:var(--sp-16);text-align:center">
+    <h1 class="text-display" style="margin-bottom:var(--sp-4)">Simple, per-team pricing.</h1>
+    <p class="muted" style="max-width:520px;margin:0 auto var(--sp-12);font-size:16px">Start free with one project. Upgrade when your team wants more repos, unlimited channels, and the full audit trail.</p>
+
+    <div class="price-grid" style="text-align:left">
+      <div class="card card-pad price-card">
+        <h2 class="text-h2">Free</h2>
+        <p class="text-sm muted" style="margin:4px 0 var(--sp-4)">For trying it on one repo.</p>
+        <div class="price-amt">$0</div>
+        <p class="text-xs subtle" style="margin-bottom:var(--sp-5)">forever</p>
+        <a class="btn btn-secondary btn-block" href="/auth/github/login">Get started</a>
+        <div class="divider" style="margin:var(--sp-5) 0"></div>
+        <div>
+          <div class="feat"><span class="ck">✓</span> 1 project</div>
+          <div class="feat"><span class="ck">✓</span> 1 GitHub repository</div>
+          <div class="feat"><span class="ck">✓</span> Up to 3 Discord channels</div>
+          <div class="feat"><span class="ck">✓</span> 30-day decision history</div>
+          <div class="feat off"><span class="ck">—</span> Supersession chains</div>
+          <div class="feat off"><span class="ck">—</span> Audit log export</div>
+        </div>
+      </div>
+
+      <div class="card card-pad price-card popular">
+        <span class="popular-tag">Most popular</span>
+        <h2 class="text-h2">Team</h2>
+        <p class="text-sm muted" style="margin:4px 0 var(--sp-4)">For engineering teams keeping a record.</p>
+        <div class="price-amt">$29<span style="font-size:16px;font-weight:500;color:var(--text-muted)"> /mo</span></div>
+        <p class="text-xs subtle" style="margin-bottom:var(--sp-5)">per team, billed monthly</p>
+        <a class="btn btn-primary btn-block" href="/auth/github/login">Start free trial</a>
+        <div class="divider" style="margin:var(--sp-5) 0"></div>
+        <div>
+          <div class="feat"><span class="ck">✓</span> Up to 5 projects</div>
+          <div class="feat"><span class="ck">✓</span> Unlimited Discord channels</div>
+          <div class="feat"><span class="ck">✓</span> Full history &amp; supersession chains</div>
+          <div class="feat"><span class="ck">✓</span> Audit log export</div>
+          <div class="feat"><span class="ck">✓</span> Reconciliation against code &amp; docs</div>
+          <div class="feat"><span class="ck">✓</span> Priority email support</div>
+        </div>
+      </div>
+
+      <div class="card card-pad price-card">
+        <h2 class="text-h2">Enterprise</h2>
+        <p class="text-sm muted" style="margin:4px 0 var(--sp-4)">For orgs with compliance needs.</p>
+        <div class="price-amt">Custom</div>
+        <p class="text-xs subtle" style="margin-bottom:var(--sp-5)">talk to us</p>
+        <a class="btn btn-secondary btn-block" href="/support">Contact sales</a>
+        <div class="divider" style="margin:var(--sp-5) 0"></div>
+        <div>
+          <div class="feat"><span class="ck">✓</span> Unlimited projects</div>
+          <div class="feat"><span class="ck">✓</span> SSO / SAML</div>
+          <div class="feat"><span class="ck">✓</span> Dedicated support &amp; SLA</div>
+          <div class="feat"><span class="ck">✓</span> On-prem / VPC deployment</div>
+          <div class="feat"><span class="ck">✓</span> Everything in Team</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-sm muted" style="margin-top:var(--sp-10)">All plans include GitHub OAuth sign-in and the read-only decision portal. <a href="/support">Questions? →</a></p>
+  </section>
+
+  <footer class="footer">
+    <div class="container row between row-wrap" style="gap:var(--sp-4)">
+      <span>© 2026 ArborDocs</span>
+      <nav class="row row-wrap" style="gap:var(--sp-5)">
+        <a href="/">Product</a><a href="/pricing">Pricing</a><a href="/support">Support</a>
+      </nav>
+    </div>
+  </footer>
+{% endblock %}

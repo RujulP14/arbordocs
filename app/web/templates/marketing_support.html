@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Support · ArborDocs{% endblock %}
+{% block brand_href %}/{% endblock %}
+{% block nav %}
+  <a href="/">Product</a>
+  <a href="/pricing">Pricing</a>
+  <a href="/support" class="active">Support</a>
+{% endblock %}
+{% block main %}
+  <section class="container" style="padding-top:var(--sp-16)">
+    <div style="text-align:center;margin-bottom:var(--sp-12)">
+      <h1 class="text-display" style="margin-bottom:var(--sp-3)">Support</h1>
+      <p class="muted" style="font-size:16px">Answers to common questions, or send us a note.</p>
+    </div>
+
+    <div class="support-grid">
+      <div>
+        <h2 class="text-h2" style="margin-bottom:var(--sp-4)">Frequently asked</h2>
+        <div class="faq">
+          <details open>
+            <summary>How does ArborDocs decide what counts as a "decision"?</summary>
+            <p>An LLM pipeline reads new messages in your watched channels and extracts statements that read as durable technical or process decisions — "let's go with Postgres," "all API responses must be paginated." Every candidate goes to a human review queue before it becomes a record; nothing is published automatically.</p>
+          </details>
+          <details>
+            <summary>Does the bot read everything in our Discord?</summary>
+            <p>Only the channels you explicitly select, and only messages posted after you connect. It never reads DMs and it never posts to your server. You can remove a channel at any time.</p>
+          </details>
+          <details>
+            <summary>What does "reconciliation" actually check?</summary>
+            <p>For each decision, ArborDocs surfaces the related code and docs in your connected repo by embedding similarity, so a reviewer can eyeball whether the codebase matches. Today it flags results as <span class="tag-mono">unverified</span> — a human judges consistency. Automatic consistency/contradiction detection is on the roadmap.</p>
+          </details>
+          <details>
+            <summary>What happens when a decision changes?</summary>
+            <p>Decisions are a record, not a wiki. To change one, a new decision is proposed in chat and approved; it's then linked to the one it replaces (a single supersession hop), and the old decision is marked <span class="tag-mono">superseded</span>. The full timeline lives in each decision's audit log.</p>
+          </details>
+          <details>
+            <summary>Who can see the decision portal?</summary>
+            <p>Anyone on your verified team can browse the read-only portal to answer "why did we do it this way?" Only admins can connect integrations and approve, edit, or reject decisions.</p>
+          </details>
+          <details>
+            <summary>How do I get access after signing in?</summary>
+            <p>Signing in with GitHub creates your account, then an admin on your team verifies it. Until then you'll see the pending-approval screen. You'll be notified the moment you're approved.</p>
+          </details>
+        </div>
+      </div>
+
+      <div>
+        <div class="card card-pad">
+          <h2 class="text-h3" style="margin-bottom:6px">Contact us</h2>
+          <p class="text-sm muted" style="margin-bottom:var(--sp-5)">We usually reply within one business day.</p>
+          {% if sent %}
+            <div class="notice notice-accent">
+              <span>✓</span>
+              <div class="text-sm">Thanks — your message has been sent. We'll get back to you soon.</div>
+            </div>
+          {% else %}
+            <form method="post" action="/support/contact" class="stack-4">
+              <div class="field">
+                <label for="name">Name</label>
+                <input class="input" id="name" name="name" type="text" placeholder="Jane Doe">
+              </div>
+              <div class="field">
+                <label for="email">Work email</label>
+                <input class="input" id="email" name="email" type="email" placeholder="jane@company.com" required>
+              </div>
+              <div class="field">
+                <label for="topic">Topic</label>
+                <select class="select" id="topic" name="topic">
+                  <option>General question</option>
+                  <option>Billing</option>
+                  <option>Bug report</option>
+                  <option>Enterprise / sales</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="msg">Message</label>
+                <textarea class="textarea" id="msg" name="message" placeholder="How can we help?"></textarea>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit">Send message</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container row between row-wrap" style="gap:var(--sp-4)">
+      <span>© 2026 ArborDocs</span>
+      <nav class="row row-wrap" style="gap:var(--sp-5)">
+        <a href="/">Product</a><a href="/pricing">Pricing</a><a href="/support">Support</a>
+      </nav>
+    </div>
+  </footer>
+{% endblock %}

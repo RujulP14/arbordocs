@@ -8,6 +8,7 @@ from app.config import settings
 from app.db.models import User
 from app.db.session import async_session
 from app.ingestion.github.client import github_app_client
+from app.web.templating import templates
 
 router = APIRouter(prefix="/auth/github", tags=["auth"])
 
@@ -17,7 +18,12 @@ def _callback_url() -> str:
 
 
 @router.get("/login")
-async def login(request: Request) -> RedirectResponse:
+async def login(request: Request):
+    return templates.TemplateResponse(request, "auth_login.html", {"user": None})
+
+
+@router.get("/start")
+async def start(request: Request) -> RedirectResponse:
     state = secrets.token_urlsafe(24)
     request.session["oauth_state"] = state
     url = github_app_client.oauth_authorize_url(redirect_uri=_callback_url(), state=state)
@@ -57,12 +63,8 @@ async def callback(request: Request, code: str, state: str) -> RedirectResponse:
 
 
 @router.get("/pending")
-async def pending(login: str = "") -> dict:
-    detail = "Your ArborDocs account has been created and is awaiting approval."
-    if login:
-        detail += f" GitHub identity received: '{login}'."
-    detail += " Ask an existing admin to verify your account."
-    return {"detail": detail}
+async def pending(request: Request, login: str = ""):
+    return templates.TemplateResponse(request, "auth_pending.html", {"user": None, "login": login})
 
 
 @router.post("/logout")

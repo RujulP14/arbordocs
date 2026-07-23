@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}ArborDocs — a changelog for your team's decisions{% endblock %}
+{% block brand_href %}/{% endblock %}
+{% block nav %}
+  <a href="/" class="active">Product</a>
+  <a href="/pricing">Pricing</a>
+  <a href="/support">Support</a>
+{% endblock %}
+{% block main %}
+  <section class="hero">
+    <span class="eyebrow">◇ Now watching Discord + GitHub</span>
+    <h1>A changelog for the decisions your team makes in chat.</h1>
+    <p class="lead">ArborDocs reads your Discord, extracts durable technical decisions, checks them against your GitHub repo, and files them in a searchable record — so "why did we do it this way?" has an answer.</p>
+    <div class="hero-cta">
+      <a class="btn btn-github btn-lg" href="/auth/github/login"><span class="g">⑂</span> Continue with GitHub</a>
+      <a class="btn btn-secondary btn-lg" href="/pricing">See pricing</a>
+    </div>
+    <p class="text-xs subtle" style="margin-top:var(--sp-4)">Free for one project. No credit card.</p>
+
+    <div class="preview-frame">
+      <div class="preview-bar">
+        <div class="traffic"><span></span><span></span><span></span></div>
+        <span class="mono text-xs subtle" style="margin-left:8px">arbordocs.app/portal/arbordocs-core</span>
+      </div>
+      <div style="padding:var(--sp-5);text-align:left">
+        <div class="row between" style="margin-bottom:var(--sp-4)">
+          <strong class="text-sm">Decisions · ArborDocs Core</strong>
+          <span class="badge badge-green"><span class="dot"></span>52 active</span>
+        </div>
+        <div class="card"><div class="list-rows">
+          <div class="list-row"><div class="lr-main"><div class="lr-title">All API list responses must be paginated (page size 50).</div><div class="lr-meta"><span>#backend-architecture</span></div></div><div class="lr-side"><span class="badge badge-recon badge-gray">Unverified</span><span class="badge badge-green"><span class="dot"></span>Active</span></div></div>
+          <div class="list-row"><div class="lr-main"><div class="lr-title">Adopt Postgres 16 as the primary datastore.</div><div class="lr-meta"><span>#backend-architecture</span></div></div><div class="lr-side"><span class="badge badge-amber"><span class="dot"></span>Proposed</span></div></div>
+          <div class="list-row"><div class="lr-main"><div class="lr-title">Session tokens live in Redis with a 30-day sliding expiry.</div><div class="lr-meta"><span>supersedes the JWT decision</span></div></div><div class="lr-side"><span class="badge badge-green"><span class="dot"></span>Active</span></div></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container" style="padding-top:var(--sp-16)">
+    <div style="text-align:center;margin-bottom:var(--sp-10)">
+      <p class="uppercase-label">How it works</p>
+      <h2 class="text-h1" style="margin-top:8px">From a throwaway message to a decision of record.</h2>
+    </div>
+    <div class="steps">
+      <div>
+        <div class="step-num">1</div>
+        <h3 class="text-h3" style="margin-bottom:6px">Watch the conversation</h3>
+        <p class="text-sm muted">Connect your GitHub repo and the Discord channels where your team actually argues. ArborDocs reads new messages — it never posts.</p>
+      </div>
+      <div>
+        <div class="step-num">2</div>
+        <h3 class="text-h3" style="margin-bottom:6px">Extract &amp; reconcile</h3>
+        <p class="text-sm muted">An LLM pipeline pulls out durable decisions and surfaces the related code and docs from your repo, so you can see what the codebase actually does.</p>
+      </div>
+      <div>
+        <div class="step-num">3</div>
+        <h3 class="text-h3" style="margin-bottom:6px">Review &amp; publish</h3>
+        <p class="text-sm muted">You approve, edit, or reject each one. Approved decisions land in a searchable, read-only portal with full history and supersession chains.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container" style="padding-top:var(--sp-16)">
+    <div class="feature-grid">
+      <div class="card card-pad">
+        <h3 class="text-h3" style="margin-bottom:6px">Human review, always</h3>
+        <p class="text-sm muted">Nothing becomes a decision of record without a person approving it. The pipeline proposes; your team decides.</p>
+      </div>
+      <div class="card card-pad">
+        <h3 class="text-h3" style="margin-bottom:6px">Checked against the code</h3>
+        <p class="text-sm muted">Every decision links to the related files in your repo by similarity, so drift between "what we said" and "what we built" is visible.</p>
+      </div>
+      <div class="card card-pad">
+        <h3 class="text-h3" style="margin-bottom:6px">Full history &amp; supersession</h3>
+        <p class="text-sm muted">When a decision reverses an older one, the two are linked. Every event is in an append-only audit log.</p>
+      </div>
+      <div class="card card-pad">
+        <h3 class="text-h3" style="margin-bottom:6px">Read-only for everyone else</h3>
+        <p class="text-sm muted">Anyone on the team can search the portal to answer "why did we do it this way?" — without touching the record.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container" style="padding-top:var(--sp-16)">
+    <div class="cta-band">
+      <h2 class="text-h1" style="margin-bottom:8px">Stop re-litigating decisions you already made.</h2>
+      <p class="muted" style="margin-bottom:var(--sp-6)">Set up your first project in a few minutes.</p>
+      <a class="btn btn-github btn-lg" href="/auth/github/login"><span class="g">⑂</span> Continue with GitHub</a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container row between row-wrap" style="gap:var(--sp-4)">
+      <span>© 2026 ArborDocs</span>
+      <nav class="row row-wrap" style="gap:var(--sp-5)">
+        <a href="/">Product</a><a href="/pricing">Pricing</a><a href="/support">Support</a>
+      </nav>
+    </div>
+  </footer>
+{% endblock %}

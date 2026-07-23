@@ -1,30 +1,48 @@
 {% extends "base.html" %}
 {% block title %}Decisions — {{ project.name }}{% endblock %}
+{% block nav %}
+  <a href="/projects">Projects</a>
+  <a href="/projects/{{ project.id }}/portal" class="active">Portal</a>
+{% endblock %}
 {% block content %}
-  <a href="/projects/{{ project.id }}" class="back-link">← {{ project.name }}</a>
-  <h1>Decisions</h1>
-  <p style="color: var(--text-muted); margin-top: -0.25rem;">
-    Active decisions the team has made — read-only.
-  </p>
+  <div class="notice" style="margin-bottom:var(--sp-6)">
+    <span>🔒</span><span class="text-sm">Read-only decision portal for <strong>{{ project.name }}</strong>. This is the team's record of active decisions — editing happens in the review queue.</span>
+  </div>
 
-  <form method="get" class="new-project-form">
-    <input type="text" name="type" placeholder="Filter by type" value="{{ type_filter }}">
-    <input type="text" name="scope" placeholder="Filter by scope" value="{{ scope_filter }}">
-    <button type="submit">Filter</button>
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>Decisions</h1>
+      <p class="sub">{{ decisions|length }} active decision{{ "s" if decisions|length != 1 else "" }}. Search to answer "why did we do it this way?"</p>
+    </div>
+  </div>
+
+  <form method="get" class="toolbar">
+    <input class="input" style="flex:1;max-width:260px" type="text" name="type" placeholder="Filter by type" value="{{ type_filter }}">
+    <input class="input" style="flex:1;max-width:260px" type="text" name="scope" placeholder="Filter by scope" value="{{ scope_filter }}">
+    <button class="btn btn-secondary" type="submit">Filter</button>
   </form>
 
-  <ul class="decision-list">
-    {% for decision in decisions %}
-      <li>
-        <a class="decision-row" href="/projects/{{ project.id }}/portal/{{ decision.id }}">
-          <span class="statement">{{ decision.statement }}</span>
-          <span class="badge">{{ decision.type }}</span>
-          {% if decision.scope %}<span class="badge">{{ decision.scope }}</span>{% endif %}
-          <span class="badge badge-confidence">confidence {{ "%.0f"|format(decision.confidence * 100) }}%</span>
+  <div class="card">
+    <div class="list-rows">
+      {% for decision in decisions %}
+        <a class="list-row" href="/projects/{{ project.id }}/portal/{{ decision.id }}">
+          <div class="lr-main">
+            <div class="lr-title">{{ decision.statement }}</div>
+            <div class="lr-meta">
+              <span>{{ decision.type }}</span>
+              {% if decision.scope %}<span>·</span><span>{{ decision.scope }}</span>{% endif %}
+              <span>·</span><span>{{ "%.0f"|format(decision.confidence * 100) }}% confidence</span>
+            </div>
+          </div>
+          <div class="lr-side">
+            {% if decision.reconciliation %}<span class="badge badge-recon badge-gray">{{ decision.reconciliation.state|capitalize }}</span>{% endif %}
+            <span class="badge badge-green"><span class="dot"></span>Active</span>
+            <span class="chev">›</span>
+          </div>
         </a>
-      </li>
-    {% else %}
-      <li class="empty">No active decisions yet.</li>
-    {% endfor %}
-  </ul>
+      {% else %}
+        <div class="empty-inline">No active decisions yet.</div>
+      {% endfor %}
+    </div>
+  </div>
 {% endblock %}
