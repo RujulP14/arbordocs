@@ -68,7 +68,11 @@ async def project_detail(
     project = await db.scalar(
         select(Project)
         .where(Project.id == project_id)
-        .options(selectinload(Project.github_installation), selectinload(Project.channels))
+        .options(
+            selectinload(Project.github_installation),
+            selectinload(Project.google_drive_installation),
+            selectinload(Project.channels),
+        )
     )
 
     proposed_count, active_count = (

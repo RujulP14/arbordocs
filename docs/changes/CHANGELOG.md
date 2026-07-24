@@ -5,6 +5,65 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Google Drive connection + doc indexing — issue #14, piece 1)
+- New `GoogleDriveInstallation` model (migration
+  `0010_google_drive_installation`) — one Drive folder per project, OAuth
+  per-admin, storing the connecting admin's refresh token (Google's access
+  tokens expire hourly; every sync mints a fresh one from it).
+- `RepoDocument` gains a third `kind` value, `"drive_section"`, alongside
+  `doc_section`/`code_symbol` — one unified table, not a new one. Both
+  `sync_repo_index`'s (GitHub) and the new `sync_drive_index`'s (Drive)
+  resync deletes are now scoped by `kind`, so a resync of one source never
+  touches the other's rows for the same project.
+- `app/ingestion/google/client.py`'s `GoogleDriveClient` — raw `httpx`
+  calls against Drive v3/Docs v1 (no Google SDK dependency, matching this
+  project's GitHub-client convention): OAuth exchange/refresh, folder
+  listing, recursive doc listing, and Docs-v1-structured-body-to-markdown
+  flattening (`get_doc_content`) so `parse_doc_sections` (reused as-is
+  from `github_index.py`) can chunk Drive docs without modification.
+- `app/web/integrations_google.py` — connect/callback/attach routes
+  mirroring `integrations_github.py`; the OAuth refresh token is held
+  server-side in the session rather than round-tripped through a hidden
+  form field, since it's a real long-lived credential (unlike GitHub's
+  non-secret `installation_id`).
+- New "Google Drive" section on the project detail page and its own
+  folder-picker template.
+- `run_google_sync` wired into the worker poll loop, mirroring
+  `run_github_sync`'s `last_synced_at`/interval gating.
+- **Two real bugs found and fixed during live smoke testing**, not caught
+  by unit tests written before real API access existed:
+  - Drive's `files.list` only returns a folder's direct children — a real
+    test folder had every actual Google Doc nested in subfolders, so the
+    initial flat listing found nothing. `list_folder_docs` now recurses
+    into subfolders (`max_depth=5` cap).
+  - A real folder ("Rujul Dudhat FTE") was invisible in the connect
+    flow's folder picker because it's shared with the connecting admin,
+    not owned by them — Drive treats these as separate query surfaces.
+    `list_folders` now queries both `'me' in owners` and `sharedWithMe`
+    and merges the results, deduplicated by id.
+  - Both fixes are covered by new regression tests in
+    `tests/test_google_client.py`.
+- 12 new unit tests total across `tests/test_google_client.py` (7) and
+  `tests/test_drive_index.py` (5, including a dedicated test proving a
+  Drive resync never deletes a project's GitHub-sourced rows).
+- Verified end-to-end against the real Google Drive/Docs API: connected a
+  real Drive folder via the live OAuth flow (working through a real
+  Google OAuth-consent-screen "Testing" mode test-user gate); fetched a
+  real shared Google Doc ("Trilogy Onboarding Runbook (Generic Tools)")
+  and confirmed the heading-flattening + `parse_doc_sections` pipeline
+  produced 19 correctly-anchored sections; ran the real `sync_drive_index`
+  against the actual connected installation (which has no docs — an
+  honest empty result, not a bug); confirmed via Postgres that 288
+  GitHub-sourced `code_symbol` + 102 `doc_section` rows were completely
+  undisturbed by Drive sync/resync throughout testing. Full test suite
+  (97 tests) and `ruff check`/`ruff format --check` both clean.
+- **Not yet in this piece** (tracked as piece 2 of issue #14): reusing
+  reconciliation's retrieval pattern to find related `drive_section` rows
+  for an approved decision, LLM draft generation, the preview/regenerate/
+  apply review-UI flow, and audit-ledger logging of applied edits. Inline
+  editing of a drafted edit before applying is deferred to its own
+  separate follow-up issue.
+
 ### Added (Discord Thread ingestion + grouping)
 - `Message` gains `thread_starter_message_id` (migration
   `0009_thread_starter_message`, mirrors `reply_to_message_id`'s shape) —
