@@ -25,6 +25,7 @@
     <a href="/projects/{{ project.id }}" class="active">Decisions</a>
     <a href="/integrations/github/connect/{{ project.id }}">GitHub</a>
     <a href="/integrations/discord/connect/{{ project.id }}">Discord</a>
+    <a href="/integrations/google/connect/{{ project.id }}">Google Drive</a>
   </nav>
 
   {% if proposed_count %}
@@ -90,6 +91,16 @@
             {% endif %}
           </div>
           {% if project.channels %}<div class="text-xs subtle">{% for ch in project.channels %}#{{ ch.channel_name or ch.channel_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+          <div class="divider"></div>
+          <div class="row between">
+            <div class="hstack-tight"><span>▤</span><span class="text-sm">Google Drive</span></div>
+            {% if project.google_drive_installation %}
+              <span class="badge badge-green"><span class="dot"></span>Connected</span>
+            {% else %}
+              <a class="btn btn-secondary btn-sm" href="/integrations/google/connect/{{ project.id }}">Connect</a>
+            {% endif %}
+          </div>
+          {% if project.google_drive_installation %}<div class="text-xs subtle">{{ project.google_drive_installation.folder_name or project.google_drive_installation.folder_id }}</div>{% endif %}
         </div>
       </div>
       <div class="card card-pad">

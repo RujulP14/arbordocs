@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Connect Google Drive · ArborDocs{% endblock %}
+{% block content %}
+  <div class="breadcrumb">
+    <a href="/projects">Projects</a><span class="sep">/</span><a href="/projects/{{ project.id }}">{{ project.name }}</a><span class="sep">/</span><span>Google Drive</span>
+  </div>
+  <div class="page-head">
+    <div class="page-head-text">
+      <h1>Google Drive folder</h1>
+      <p class="sub">ArborDocs indexes the Google Docs in this folder. One folder per project.</p>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <a href="/projects/{{ project.id }}">Decisions</a>
+    <a href="/integrations/github/connect/{{ project.id }}">GitHub</a>
+    <a href="/integrations/discord/connect/{{ project.id }}">Discord</a>
+    <a href="/integrations/google/connect/{{ project.id }}" class="active">Google Drive</a>
+  </nav>
+
+  <form method="post" action="/integrations/google/attach/{{ project.id }}">
+    <div class="card" style="margin-top:var(--sp-4)">
+      <div class="list-rows">
+        {% for folder in folders %}
+          <label class="list-row" style="cursor:pointer">
+            <input type="radio" name="folder" value="{{ folder.id }}|{{ folder.name }}" class="radio" style="margin-right:2px" required
+              {% if project.google_drive_installation and project.google_drive_installation.folder_id == folder.id %}checked{% endif %}>
+            <div class="lr-main">
+              <div class="lr-title mono">{{ folder.name }}</div>
+            </div>
+            {% if project.google_drive_installation and project.google_drive_installation.folder_id == folder.id %}
+              <div class="lr-side"><span class="badge badge-green"><span class="dot"></span>Currently connected</span></div>
+            {% endif %}
+          </label>
+        {% else %}
+          <div class="empty-inline">No folders were found in this Google Drive account.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:var(--sp-6)">
+      <button class="btn btn-primary" type="submit">Save folder</button>
+      <a class="btn btn-ghost" href="/projects/{{ project.id }}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

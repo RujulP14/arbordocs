@@ -52,6 +52,9 @@ class Project(Base):
     github_installation: Mapped["GitHubInstallation | None"] = relationship(
         back_populates="project", uselist=False, cascade="all, delete-orphan"
     )
+    google_drive_installation: Mapped["GoogleDriveInstallation | None"] = relationship(
+        back_populates="project", uselist=False, cascade="all, delete-orphan"
+    )
     channels: Mapped[list["ProjectChannel"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
@@ -70,6 +73,33 @@ class GitHubInstallation(Base):
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     project: Mapped["Project"] = relationship(back_populates="github_installation")
+
+
+class GoogleDriveInstallation(Base):
+    """A project's connected Google Drive folder (issue #14, piece 1).
+
+    OAuth per-admin (mirrors GitHubInstallation's shape) — but unlike
+    GitHub's long-lived JWT-derived installation tokens, Google's OAuth
+    access tokens expire hourly, so the authorizing admin's `refresh_token`
+    is stored to mint fresh access tokens on every sync without them
+    present. Stored as plain text, matching this project's existing
+    precedent (the GitHub App private key is also a plain base64 env var,
+    not per-row-encrypted) — not a new regression in this piece.
+    """
+
+    __tablename__ = "google_drive_installations"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("projects.id"), unique=True, nullable=False
+    )
+    folder_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    folder_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    project: Mapped["Project"] = relationship(back_populates="google_drive_installation")
 
 
 class DiscordGuild(Base):
@@ -245,15 +275,21 @@ class Decision(Base):
 
 
 class RepoDocument(Base):
-    """A GitHub repo's ground-truth index — doc sections and code symbols
-    (SPEC.md §4), queryable by the reconciliation engine (Phase 5).
+    """A project's ground-truth index — GitHub doc sections/code symbols
+    (SPEC.md §4) and, since issue #14, Google Drive doc sections — queryable
+    by the reconciliation engine (Phase 5) and, eventually, Drive
+    draft-generation (issue #14, piece 2).
 
-    Unified table rather than two separate ones: both kinds are
-    conceptually "a chunk of repo content with an embedding," and
+    Unified table rather than one per source/kind: every row is
+    conceptually "a chunk of repo/doc content with an embedding," and
     reconciliation queries "find related content for this decision" once,
-    not once per content type. `kind` distinguishes them; `symbol_name` and
-    `line_start`/`line_end` only apply to `kind="code_symbol"`. Resync
-    replaces a project's rows wholesale rather than diffing incrementally.
+    not once per content type. `kind` discriminates `doc_section`
+    (GitHub), `code_symbol` (GitHub), and `drive_section` (Google Drive);
+    `symbol_name` and `line_start`/`line_end` only apply to
+    `kind="code_symbol"`. Resync replaces a project's rows for one `kind`
+    wholesale rather than diffing incrementally — scoped by `kind` so a
+    Drive resync never touches a project's GitHub-sourced rows and vice
+    versa.
     """
 
     __tablename__ = "repo_documents"

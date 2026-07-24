@@ -103,6 +103,25 @@ with correct GitHub-style anchors, e.g.
 `docs/SPEC.md#5-the-decision-extractor-the-make-or-break-component` and
 `app/pipeline/extraction.py#extract_decision`.
 
+**Google Drive ingestion (a distinct, later-added component — issue #14).**
+Unlike GitHub, this is *not* part of the "objective ground truth, never
+auto-update docs" framing above — Drive is explicitly where a later piece
+(issue #14, piece 2, not yet built) will let the pipeline draft and, after
+human confirmation, apply edits to a real Google Doc. Piece 1 (connection +
+indexing) is implemented: one Drive folder per project via OAuth per-admin
+(`GoogleDriveInstallation`, migration `0010_google_drive_installation`);
+`app/pipeline/drive_index.py`'s `sync_drive_index` recursively lists every
+Google Doc under the connected folder (Drive's own `files.list` only
+returns direct children), fetches and flattens each into markdown-heading
+text, and reuses `parse_doc_sections` (github_index.py, unmodified) to
+chunk it into the same `RepoDocument` table as GitHub content, under a
+third `kind`, `"drive_section"` — resync is scoped by `kind` so GitHub and
+Drive content never clobber each other for the same project. Verified
+end-to-end against the real Drive/Docs API: a real shared Google Doc
+("Trilogy Onboarding Runbook (Generic Tools)") produced 19 correctly-
+anchored sections, and GitHub-sourced rows for the same project were
+confirmed undisturbed throughout.
+
 **Decision extractor.** The core NLP pipeline. See §5 for the full design.
 
 **Reconciliation engine.** Given a structured, active decision with a `scope`,

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     discord_oauth_client_id: str = ""
     discord_oauth_client_secret: str = ""
 
+    # Google Drive — OAuth per-admin, one Drive folder per project (issue #14).
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-120b"
     ollama_model: str = "qwen2.5:7b"
@@ -48,6 +52,9 @@ class Settings(BaseSettings):
     # Phase 5 — reconciliation engine (tier-b: embedding-similarity surfacing).
     reconciliation_similarity_threshold: float = 0.35
     reconciliation_max_related: int = 5
+
+    # Google Drive content ingestion (issue #14, piece 1).
+    google_sync_interval_seconds: int = 3600
 
 
 settings = Settings()

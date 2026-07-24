@@ -147,7 +147,14 @@ async def sync_repo_index(db: AsyncSession, project_id, client=None, embedder=No
         else:
             chunks.extend(parse_code_symbols(path, content))
 
-    await db.execute(delete(RepoDocument).where(RepoDocument.project_id == project_id))
+    # Scoped by kind (issue #14) — a GitHub resync must never delete this
+    # project's Drive-sourced rows, which share the same table.
+    await db.execute(
+        delete(RepoDocument).where(
+            RepoDocument.project_id == project_id,
+            RepoDocument.kind.in_(["doc_section", "code_symbol"]),
+        )
+    )
 
     documents = []
     for chunk in chunks:

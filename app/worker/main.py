@@ -5,11 +5,19 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.models import Candidate, Decision, DiscussionUnit, GitHubInstallation, utcnow
+from app.db.models import (
+    Candidate,
+    Decision,
+    DiscussionUnit,
+    GitHubInstallation,
+    GoogleDriveInstallation,
+    utcnow,
+)
 from app.db.session import async_session
 from app.ingestion.discord.client import discord_bot_client
 from app.pipeline.audit import log_event
 from app.pipeline.candidate_filter import score_unit
+from app.pipeline.drive_index import sync_drive_index
 from app.pipeline.extraction import extract_decision
 from app.pipeline.github_index import sync_repo_index
 from app.pipeline.reconciliation import reconcile_decision
@@ -262,6 +270,34 @@ async def run_github_sync() -> None:
             )
 
 
+async def run_google_sync() -> None:
+    """Google Drive content index (issue #14, piece 1). Same
+    last_synced_at/interval gating as run_github_sync, its own config
+    setting since Drive content likely changes on a different cadence.
+    """
+    cutoff = utcnow() - timedelta(seconds=settings.google_sync_interval_seconds)
+    async with async_session() as db:
+        installations = (
+            await db.scalars(
+                select(GoogleDriveInstallation).where(
+                    (GoogleDriveInstallation.last_synced_at.is_(None))
+                    | (GoogleDriveInstallation.last_synced_at < cutoff)
+                )
+            )
+        ).all()
+
+        for installation in installations:
+            documents = await sync_drive_index(db, installation.project_id)
+            installation.last_synced_at = utcnow()
+            await db.commit()
+            logger.info(
+                "google drive folder synced: project=%s folder=%s documents=%d",
+                installation.project_id,
+                installation.folder_id,
+                len(documents),
+            )
+
+
 async def poll_once() -> None:
     closed = await close_due_units()
     if closed:
@@ -273,6 +309,7 @@ async def poll_once() -> None:
                 await run_supersession(decisions)
                 await run_reconciliation(decisions)
     await run_github_sync()
+    await run_google_sync()
 
 
 async def run_forever() -> None:

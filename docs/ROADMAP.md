@@ -352,6 +352,65 @@ is checked off.
       both real participants recorded, and the conversation extracted
       through the full pipeline into a real `proposed` decision ("Cache
       search results with a 5-minute TTL").
+- [x] **Google Drive connection + doc indexing (issue #14, piece 1 of 2).**
+      First piece of the Drive integration: connect a Google Drive folder
+      to a project (OAuth per-admin) and index its Google Docs the same
+      way `github_index.py` indexes a repo's docs — no LLM drafting or
+      apply-to-Drive logic yet (that's piece 2). `RepoDocument` gains a
+      third `kind` value, `"drive_section"`, alongside `doc_section`/
+      `code_symbol` — one unified table, not a new one, matching the
+      model's own design principle; both `sync_repo_index`'s and the new
+      `sync_drive_index`'s resync deletes are scoped by `kind` so a Drive
+      resync never touches a project's GitHub rows and vice versa. New
+      `GoogleDriveInstallation` model (migration
+      `0010_google_drive_installation`) stores the connecting admin's
+      OAuth refresh token (Google's access tokens expire hourly, unlike
+      GitHub's longer-lived installation tokens — every sync mints a
+      fresh access token from it). New `app/ingestion/google/client.py`'s
+      `GoogleDriveClient` (raw `httpx`, no Google SDK — matches this
+      project's existing GitHub-client convention) and `app/web/
+      integrations_google.py` (OAuth connect/callback/attach, mirroring
+      `integrations_github.py`; the refresh token is held server-side in
+      the session rather than round-tripped through a hidden form field,
+      since unlike GitHub's non-secret `installation_id` it's a real
+      credential).
+
+      **Two real bugs found and fixed during live smoke testing** (not
+      caught by unit tests written before real API access existed):
+      (1) Drive's `files.list` only returns a folder's *direct* children —
+      a real test folder had every actual Google Doc nested one level
+      into subfolders, so the initial flat listing found nothing;
+      `list_folder_docs` now recurses into subfolders (capped at
+      `max_depth=5`, matching this project's "lightweight index" cap
+      framing elsewhere). (2) A real folder ("Rujul Dudhat FTE") that
+      *should* have been pickable in the connect flow was invisible,
+      because it's shared with the connecting admin, not owned by them —
+      Drive treats "my own folders" and "folders shared with me" as
+      separate query surfaces; `list_folders` now queries both and merges
+      the results, deduplicated by id. Both fixes are covered by new
+      regression tests in `tests/test_google_client.py` using a fake
+      `_list_folder_children`/fake `httpx.AsyncClient`, not just the
+      existing higher-level fakes.
+
+      Verified end-to-end against the real Google Drive/Docs API (not
+      just unit tests): connected a real Drive folder via the live OAuth
+      flow (including working through a real Google OAuth-consent-screen
+      "Testing" mode / test-user gate); fetched a real shared Google Doc
+      ("Trilogy Onboarding Runbook (Generic Tools)") and confirmed
+      `get_doc_content`'s heading-flattening produced correct `#`/`##`
+      markdown, which `parse_doc_sections` (reused as-is from
+      `github_index.py`, unmodified) split into 19 real sections with
+      correct GitHub-style anchors (e.g. `#how-to-login-kerio-vpn`); ran
+      the real `sync_drive_index` against the actual connected
+      installation and confirmed it correctly returns empty when the
+      connected folder has no docs (an honest negative result, not a
+      bug); confirmed via Postgres that GitHub-sourced `RepoDocument` rows
+      (288 `code_symbol` + 102 `doc_section`, from the earlier GitHub
+      ingestion piece) were completely undisturbed by Drive sync/resync
+      operations throughout testing. 12 new unit tests across
+      `tests/test_google_client.py` and `tests/test_drive_index.py`
+      (including a dedicated regression test proving a Drive resync never
+      deletes a project's GitHub rows).
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**
