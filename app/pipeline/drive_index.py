@@ -35,7 +35,9 @@ async def sync_drive_index(db: AsyncSession, project_id, client=None, embedder=N
     chunks = []
     for doc in docs:
         content = await client.get_doc_content(access_token, doc["id"])
-        chunks.extend(parse_doc_sections(doc["name"], content))
+        for chunk in parse_doc_sections(doc["name"], content):
+            chunk["source_file_id"] = doc["id"]
+            chunks.append(chunk)
 
     await db.execute(
         delete(RepoDocument).where(

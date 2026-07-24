@@ -5,6 +5,77 @@ All notable changes to this project are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added (Google Drive LLM draft + apply — issue #26, Drive piece 2 of 2)
+- New `DriveDraftEdit` model (migration `0011_drive_draft_edit`) — one row
+  per decision, `status` `"drafted"` → `"applied"`/`"failed"`. A new table
+  rather than reusing `RepoDocument`, since this is a proposal *about* a
+  document, not indexed content.
+- `RepoDocument` gains a `source_file_id` column (migration
+  `0012_repo_doc_source_file_id`) — piece 1 only ever stored a Drive doc's
+  display name (`path`), never its real Drive file id; apply-time needs
+  the real id to call the Docs API. `sync_drive_index` now populates it.
+- New `app/pipeline/drive_draft.py` — retrieval (`find_target_drive_section`,
+  reusing `reconciliation.py`'s `find_related_repo_documents` as-is,
+  filtered to `kind="drive_section"`) + LLM draft generation
+  (`generate_draft`), mirroring `supersession.py`'s own-
+  prompt/schema/provider-dispatch shape; reuses only
+  `TRANSCRIPT_TAG`/`_sanitize_for_transcript`/`get_groq_client`/
+  `get_ollama_client` from `extraction.py`, per this codebase's
+  established cross-module-reuse boundary. Output schema is the section's
+  full replacement text (heading included), not a diff.
+- `GoogleDriveClient` (`app/ingestion/google/client.py`) gains
+  `find_section_range` (re-fetches the doc's raw structured body fresh,
+  re-locates a section by exact heading-text match, spans to the next
+  heading of equal-or-higher level, returns `None` — fail closed — on no
+  confident match) and `apply_edit` (one `documents.batchUpdate` call:
+  `deleteContentRange` + `insertText`, atomic within a single request).
+  `oauth_authorize_url`'s scope expands to add
+  `https://www.googleapis.com/auth/documents` alongside piece 1's
+  `drive.readonly` — **already-connected installations need to
+  reconnect** (re-run the OAuth flow) before apply will work, since their
+  stored refresh tokens predate the new scope.
+- `app/web/decisions.py`: `approve_decision` extended to synchronously
+  retrieve + draft (wrapped in a broad `try/except` — a draft failure
+  never blocks the approval itself), logging `drive_draft_generated`.
+  Two new routes: `POST /decisions/{id}/drive-draft/regenerate` (re-runs
+  drafting against a target, optionally human-picked via a manual
+  section-picker when no confident match was found) and `POST
+  /decisions/{id}/drive-draft/apply` (re-locates the section live,
+  writes it, logs `drive_doc_updated` with before/after text, or fails
+  closed to `status="failed"` and logs `drive_doc_update_failed`).
+- New "Drafted Google Doc edit" card on `decision_detail.html`, mirroring
+  the Reconciliation card's conditional-render shape — shows the target
+  section, the drafted text, Regenerate/Apply actions, or a manual
+  section-picker fallback.
+- **Real bug found and fixed during live smoke testing:** the first live
+  "Apply to Google Doc" click 500'd. The real Docs API rejected
+  `deleteContentRange` with `400 Invalid requests[0].deleteContentRange:
+  The range cannot include the newline character at the end of the
+  segment.` — `find_section_range` computed a to-end-of-document section
+  as ending at the body's final `endIndex`, which includes the
+  document's un-deletable terminal newline. Fixed by stopping one
+  character short of it in that case. Covered by a new regression test
+  in `tests/test_google_client.py` reproducing the exact scenario with a
+  fake structured-body response, plus 3 more new tests for
+  `find_section_range`/`apply_edit` generally (14 tests total added this
+  piece, 111 passing overall).
+- Verified end-to-end against the real Google Drive/Docs API (not just
+  unit tests): reconnected the project's real Drive folder via the live
+  OAuth flow to pick up the expanded write scope (confirmed via server
+  logs — the callback requested both `drive.readonly` and `documents`
+  scopes); added a real heading + paragraph to a real Google Doc,
+  re-synced, and confirmed `source_file_id` populated correctly; created
+  a real decision scoring 0.63 similarity (above the 0.35 threshold)
+  against the doc's real indexed content; approved it through the live
+  web UI, producing a real Groq-generated draft with a real
+  `drive_draft_generated` audit entry; clicked Apply — after the fix
+  above, succeeded, flipping `status="applied"` and logging a real
+  `drive_doc_updated` entry with full before/after text. Independently
+  cross-checked via a fresh `documents.get` call (outside the
+  application's own write path): the live Google Doc's content matches
+  the applied draft exactly. Full test suite (111 tests) and `ruff
+  check`/`ruff format --check` both clean.
+
 ### Added (Google Drive connection + doc indexing — issue #14, piece 1)
 - New `GoogleDriveInstallation` model (migration
   `0010_google_drive_installation`) — one Drive folder per project, OAuth

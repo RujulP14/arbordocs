@@ -286,7 +286,11 @@ class RepoDocument(Base):
     not once per content type. `kind` discriminates `doc_section`
     (GitHub), `code_symbol` (GitHub), and `drive_section` (Google Drive);
     `symbol_name` and `line_start`/`line_end` only apply to
-    `kind="code_symbol"`. Resync replaces a project's rows for one `kind`
+    `kind="code_symbol"`. `source_file_id` only applies to
+    `kind="drive_section"` — the real Google Drive file id (distinct from
+    `path`, which stores the doc's display name), needed to re-locate and
+    write to the live doc at apply-time (issue #26, Drive piece 2).
+    Resync replaces a project's rows for one `kind`
     wholesale rather than diffing incrementally — scoped by `kind` so a
     Drive resync never touches a project's GitHub-sourced rows and vice
     versa.
@@ -302,12 +306,46 @@ class RepoDocument(Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     path: Mapped[str] = mapped_column(String(512), nullable=False)
     symbol_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_file_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     anchor: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list | None] = mapped_column(EmbeddingColumn, nullable=True)
     line_start: Mapped[int | None] = mapped_column(nullable=True)
     line_end: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class DriveDraftEdit(Base):
+    """An LLM-drafted proposed edit to a Google Doc section (issue #26,
+    Drive piece 2) — one row per decision.
+
+    A proposal *about* a document, not indexed content itself, so this is
+    a new table rather than reusing `RepoDocument`. Never written to the
+    real Google Doc until a human explicitly applies it: `status`
+    transitions `"drafted"` -> `"applied"` (real Docs API write succeeded)
+    or `"drafted"` -> `"failed"` (the target section couldn't be
+    confidently re-located in the live doc at apply-time — Docs API
+    writes need live character-offset indices, which are resolved fresh
+    at apply-time, never persisted, since they'd go stale the moment
+    anyone edits the doc upstream of drafting).
+    """
+
+    __tablename__ = "drive_draft_edits"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    decision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("decisions.id"), unique=True, nullable=False
+    )
+    repo_document_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("repo_documents.id"), nullable=False
+    )
+    draft_content: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="drafted", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    decision: Mapped["Decision"] = relationship()
+    repo_document: Mapped["RepoDocument"] = relationship()
 
 
 class AuditLogEntry(Base):

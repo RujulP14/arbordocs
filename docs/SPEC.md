@@ -103,24 +103,48 @@ with correct GitHub-style anchors, e.g.
 `docs/SPEC.md#5-the-decision-extractor-the-make-or-break-component` and
 `app/pipeline/extraction.py#extract_decision`.
 
-**Google Drive ingestion (a distinct, later-added component — issue #14).**
-Unlike GitHub, this is *not* part of the "objective ground truth, never
-auto-update docs" framing above — Drive is explicitly where a later piece
-(issue #14, piece 2, not yet built) will let the pipeline draft and, after
-human confirmation, apply edits to a real Google Doc. Piece 1 (connection +
-indexing) is implemented: one Drive folder per project via OAuth per-admin
-(`GoogleDriveInstallation`, migration `0010_google_drive_installation`);
-`app/pipeline/drive_index.py`'s `sync_drive_index` recursively lists every
-Google Doc under the connected folder (Drive's own `files.list` only
-returns direct children), fetches and flattens each into markdown-heading
-text, and reuses `parse_doc_sections` (github_index.py, unmodified) to
-chunk it into the same `RepoDocument` table as GitHub content, under a
-third `kind`, `"drive_section"` — resync is scoped by `kind` so GitHub and
-Drive content never clobber each other for the same project. Verified
-end-to-end against the real Drive/Docs API: a real shared Google Doc
-("Trilogy Onboarding Runbook (Generic Tools)") produced 19 correctly-
-anchored sections, and GitHub-sourced rows for the same project were
-confirmed undisturbed throughout.
+**Google Drive ingestion + draft/apply (a distinct, later-added component —
+issue #14, both pieces now built).** Unlike GitHub, this is *not* part of
+the "objective ground truth, never auto-update docs" framing above — Drive
+is explicitly where the pipeline drafts and, after human confirmation,
+applies edits to a real Google Doc. Piece 1 (connection + indexing): one
+Drive folder per project via OAuth per-admin (`GoogleDriveInstallation`,
+migration `0010_google_drive_installation`); `app/pipeline/drive_index.py`'s
+`sync_drive_index` recursively lists every Google Doc under the connected
+folder (Drive's own `files.list` only returns direct children), fetches and
+flattens each into markdown-heading text, and reuses `parse_doc_sections`
+(github_index.py, unmodified) to chunk it into the same `RepoDocument`
+table as GitHub content, under a third `kind`, `"drive_section"` — resync
+is scoped by `kind` so GitHub and Drive content never clobber each other
+for the same project. `RepoDocument` also gained a `source_file_id` column
+(migration `0012_repo_doc_source_file_id`) — the real Drive file id, needed
+by piece 2's apply step, since `path` only ever stored the doc's display
+name. Verified end-to-end against the real Drive/Docs API: a real shared
+Google Doc ("Trilogy Onboarding Runbook (Generic Tools)") produced 19
+correctly-anchored sections, and GitHub-sourced rows for the same project
+were confirmed undisturbed throughout.
+
+Piece 2 (issue #26, LLM draft + apply): approving a decision synchronously
+triggers `app/pipeline/drive_draft.py` — embedding retrieval over the
+project's `drive_section` rows (reusing `reconciliation.py`'s
+`find_related_repo_documents`), then an LLM drafts the section's full
+replacement text (own prompt/schema, mirrors `supersession.py`'s per-stage
+shape). The draft is stored (`DriveDraftEdit`, migration
+`0011_drive_draft_edit`) and shown to the human on the decision detail page
+for a second, separate explicit confirmation before anything is written to
+the real doc — never auto-applied. Apply-time indices are always resolved
+live, immediately before the write (`GoogleDriveClient.find_section_range`
+re-fetches the doc's raw structured body and re-locates the target section
+by heading match), never persisted, since Docs API writes need
+character-offset indices into the *current* document and any upstream edit
+invalidates a stale one; a doc that changed too much fails closed
+(`status="failed"`) rather than guessing. Verified end-to-end against the
+real Docs API: a real decision approved through the live UI produced a
+real Groq-drafted edit, which was then actually applied to a real Google
+Doc — confirmed by an independent, fresh `documents.get` call showing the
+live document's content matches the applied draft exactly. A real Docs API
+constraint (`deleteContentRange` rejects a range reaching the document's
+terminal newline) was found and fixed during this testing.
 
 **Decision extractor.** The core NLP pipeline. See §5 for the full design.
 

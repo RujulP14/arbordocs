@@ -411,6 +411,96 @@ is checked off.
       `tests/test_google_client.py` and `tests/test_drive_index.py`
       (including a dedicated regression test proving a Drive resync never
       deletes a project's GitHub rows).
+- [x] **Google Drive draft/apply (issue #26, Drive piece 2 of 2).**
+      Closes the loop from piece 1: approving a decision now drafts an LLM
+      edit to the most-related Drive section and, on a second explicit
+      human confirmation, writes it into the real Google Doc. New
+      `DriveDraftEdit` model (migration `0011_drive_draft_edit`) — one row
+      per decision, `status` `"drafted"` → `"applied"`/`"failed"`; a new
+      table rather than reusing `RepoDocument`, since this is a proposal
+      *about* a document, not indexed content. `RepoDocument` gains a
+      `source_file_id` column (migration `0012_repo_doc_source_file_id`) —
+      piece 1 only ever stored a Drive doc's display name (`path`), never
+      its real Drive file id, which apply-time needs to call the Docs API;
+      `sync_drive_index` now populates it per chunk.
+
+      **Design, per explicit user choices:** retrieval reuses
+      `reconciliation.py`'s `find_related_repo_documents` as-is, filtered
+      to `kind="drive_section"` in a new `app/pipeline/drive_draft.py`
+      (mirrors `supersession.py`'s per-module prompt/schema/dispatch
+      shape, reusing only `TRANSCRIPT_TAG`/`_sanitize_for_transcript`/
+      `get_groq_client`/`get_ollama_client` from `extraction.py`, per this
+      codebase's established cross-module-reuse boundary). If no section
+      scores above `reconciliation_similarity_threshold`, the human sees a
+      manual section-picker on the decision detail page instead of a
+      silent no-op. Draft generation is **inline in `approve_decision`**
+      (not a separate worker stage) — wrapped in a broad `try/except` so a
+      draft failure never blocks the approval itself, logged via
+      `log_event(..., "drive_draft_generated", ...)`. The apply step
+      **never persists character-offset indices** — Google Docs'
+      `documents.batchUpdate` needs live indices into the *current*
+      document, and any edit made upstream of drafting invalidates a
+      stale one. `GoogleDriveClient.find_section_range` re-fetches the raw
+      structured body fresh, immediately before every apply, and
+      re-locates the target section by exact heading-text match, spanning
+      to the next heading of equal-or-higher level (mirroring
+      `parse_doc_sections`' own boundary logic against live structural
+      data instead of a markdown string); returns `None` (fail closed) if
+      no confident match, flipping `status="failed"` rather than guessing
+      at a stale range. `apply_edit` issues one `documents.batchUpdate`
+      call (`deleteContentRange` + `insertText`, atomic within a single
+      request). Two new routes: `POST /decisions/{id}/drive-draft/apply`
+      and `.../regenerate`; new "Drafted Google Doc edit" card on
+      `decision_detail.html` (mirrors the Reconciliation card's
+      conditional-render shape). OAuth scope expanded
+      (`oauth_authorize_url`) to add `https://www.googleapis.com/auth/
+      documents` alongside piece 1's `drive.readonly` — a real,
+      user-facing migration: every already-connected installation's stored
+      refresh token predates the new scope and needs reconnecting (running
+      the OAuth flow again) before apply will work for it.
+
+      **Real bug found and fixed during live smoke testing:** the first
+      live "Apply to Google Doc" click returned an Internal Server Error —
+      the real Docs API rejected the `deleteContentRange` call with `400
+      Invalid requests[0].deleteContentRange: The range cannot include the
+      newline character at the end of the segment.` `find_section_range`
+      was computing a section running to end-of-document as ending at the
+      body's final `endIndex`, which includes the document's terminal
+      newline — a character the Docs API will never let you delete.
+      Fixed by stopping one character short of the body's last `endIndex`
+      in that case. Covered by 4 new regression tests in
+      `tests/test_google_client.py` (including one reproducing this exact
+      end-of-document case with a fake structured-body response) plus the
+      pre-existing 10 in `tests/test_drive_draft.py` (draft generated and
+      stored on a confident match; no-match surfaces the manual-picker
+      state; regenerate replaces the draft; apply succeeds and logs
+      `drive_doc_updated` with real before/after text; apply fails closed
+      when `find_section_range` returns `None`) — 111 tests pass total,
+      no regressions.
+
+      Verified end-to-end against the real Google Drive/Docs API (not
+      just unit tests, and not the pre-fix code path): reconnected the
+      project's real Drive folder through the live OAuth flow to pick up
+      the expanded write scope (confirmed via server logs that the
+      callback requested both `drive.readonly` and `documents` scopes);
+      added a real heading + paragraph to a real Google Doc, re-synced,
+      and confirmed `source_file_id` populated correctly in Postgres;
+      created a real decision ("Switch the API to cursor-based pagination
+      instead of offset-based pagination") with a real
+      `sentence-transformers` embedding scoring 0.63 similarity (above the
+      0.35 threshold) against the doc's real indexed content; approved it
+      through the live web UI, producing a real Groq-generated draft
+      ("The API now uses cursor-based pagination for all list endpoints
+      ...") stored in Postgres with a real `drive_draft_generated` audit
+      entry; clicked Apply — after the fix above, this succeeded, flipping
+      `status="applied"` and logging a real `drive_doc_updated` entry with
+      full before/after text. Independently cross-checked via a **fresh**
+      `documents.get` call (not the same response the apply path used):
+      the live Google Doc's actual content now reads exactly the applied
+      draft text — confirmed outside the application's own write path.
+      Cleaned up the smoke-test decision/candidate/discussion-unit rows
+      from the dev database afterward; left the doc's edited (correct,
+      harmless) content in place.
 - [ ] **Phase 6 (stretch) — Tier-a concrete contradiction detection; Slack
       adapter; query bot (RAG over approved decisions with citations);
       per-domain configs reframed as "specialist agents."**

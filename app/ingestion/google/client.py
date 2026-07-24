@@ -22,6 +22,23 @@ _HEADING_STYLE_TO_MARKDOWN_PREFIX = {
     "HEADING_6": "###### ",
 }
 
+# Same style set, as a numeric level (lower = higher/outer heading) — used
+# by find_section_range to decide where a section ends: at the next
+# heading of equal-or-higher level, mirroring parse_doc_sections' own
+# next-heading-or-EOF boundary logic but against live structural data.
+_HEADING_STYLE_LEVEL = {
+    "HEADING_1": 1,
+    "HEADING_2": 2,
+    "HEADING_3": 3,
+    "HEADING_4": 4,
+    "HEADING_5": 5,
+    "HEADING_6": 6,
+}
+
+
+def _paragraph_text(paragraph: dict) -> str:
+    return "".join(run.get("textRun", {}).get("content", "") for run in paragraph.get("elements", [])).strip()
+
 
 def _flatten_docs_body(document: dict) -> str:
     """Render a Docs v1 `documents.get` response's structured body as
@@ -55,6 +72,12 @@ class GoogleDriveClient:
     """
 
     def oauth_authorize_url(self, redirect_uri: str, state: str) -> str:
+        # Scope expanded for issue #26 (Drive piece 2) to include Docs write
+        # access alongside piece 1's read-only listing/indexing scope —
+        # already-connected installations' stored refresh tokens predate
+        # this and won't carry the new scope, so they need reconnecting
+        # (re-running this OAuth flow) before apply-to-Drive will work.
+        scope = "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/documents"
         return (
             "https://accounts.google.com/o/oauth2/v2/auth"
             f"?client_id={settings.google_client_id}"
@@ -62,7 +85,7 @@ class GoogleDriveClient:
             "&response_type=code"
             "&access_type=offline"
             "&prompt=consent"
-            "&scope=https://www.googleapis.com/auth/drive.readonly"
+            f"&scope={scope}"
             f"&state={state}"
         )
 
@@ -173,6 +196,99 @@ class GoogleDriveClient:
             )
             resp.raise_for_status()
             return _flatten_docs_body(resp.json())
+
+    async def find_section_range(
+        self, access_token: str, file_id: str, heading_text: str
+    ) -> tuple[int, int] | None:
+        """Re-fetches the doc's raw structured body (not the flattened
+        string `get_doc_content` returns) and locates the live character-
+        offset range of the section whose heading matches `heading_text`
+        exactly (issue #26, Drive piece 2).
+
+        This is always called fresh, immediately before an apply — never
+        cached or persisted — because Docs API writes need indices into
+        the *current* document state, and any edit made upstream of
+        drafting would silently invalidate a stale range. Returns None
+        (fail closed) if no paragraph's heading text matches exactly,
+        which the caller must treat as "can't confidently locate the
+        section, don't write."
+
+        The returned range spans from the matching heading's start to the
+        start of the next heading of equal-or-higher level (or end of
+        document) — the same next-heading-or-EOF boundary
+        `app.pipeline.github_index.parse_doc_sections` uses, just computed
+        against live structural paragraphs instead of a markdown string.
+        """
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{GOOGLE_DOCS_API}/documents/{file_id}",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            resp.raise_for_status()
+            document = resp.json()
+
+        paragraphs = []
+        for element in document.get("body", {}).get("content", []):
+            paragraph = element.get("paragraph")
+            if paragraph is None:
+                continue
+            style = paragraph.get("paragraphStyle", {}).get("namedStyleType", "")
+            level = _HEADING_STYLE_LEVEL.get(style)
+            if level is None:
+                continue
+            paragraphs.append(
+                {
+                    "level": level,
+                    "text": _paragraph_text(paragraph),
+                    "startIndex": element["startIndex"],
+                }
+            )
+
+        match_index = next((i for i, p in enumerate(paragraphs) if p["text"] == heading_text.strip()), None)
+        if match_index is None:
+            return None
+
+        match = paragraphs[match_index]
+        # The Docs API rejects a deleteContentRange that reaches the body's
+        # very last character — the document's terminal newline can never
+        # be deleted — so a section running to end-of-document stops one
+        # character short of it, rather than at the last paragraph's own
+        # endIndex.
+        end_index = document["body"]["content"][-1]["endIndex"] - 1
+        for later in paragraphs[match_index + 1 :]:
+            if later["level"] <= match["level"]:
+                end_index = later["startIndex"]
+                break
+
+        return match["startIndex"], end_index
+
+    async def apply_edit(
+        self, access_token: str, file_id: str, start_index: int, end_index: int, new_content: str
+    ) -> None:
+        """Replaces the live range [start_index, end_index) with
+        `new_content` via a single `documents.batchUpdate` call —
+        `deleteContentRange` immediately followed by `insertText` at the
+        range's start, both in one request so the Docs API applies them
+        atomically (in-order within a single batchUpdate), avoiding a
+        partial-delete-then-failed-insert state.
+        """
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{GOOGLE_DOCS_API}/documents/{file_id}:batchUpdate",
+                headers={"Authorization": f"Bearer {access_token}"},
+                json={
+                    "requests": [
+                        {"deleteContentRange": {"range": {"startIndex": start_index, "endIndex": end_index}}},
+                        {
+                            "insertText": {
+                                "location": {"index": start_index},
+                                "text": new_content,
+                            }
+                        },
+                    ]
+                },
+            )
+            resp.raise_for_status()
 
 
 google_drive_client = GoogleDriveClient()
