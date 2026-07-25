@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.models import GitHubInstallation, Project, User
 from app.db.session import get_db
@@ -33,7 +34,12 @@ async def callback(
     db: AsyncSession = Depends(get_db),
 ):
     project_id = uuid.UUID(state)
-    project = await db.get(Project, project_id)
+    result = await db.execute(
+        select(Project)
+        .where(Project.id == project_id)
+        .options(selectinload(Project.github_installation))
+    )
+    project = result.scalar_one_or_none()
     if project is None:
         raise HTTPException(status_code=404)
 
