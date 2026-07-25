@@ -7,7 +7,6 @@ from app.config import settings
 from app.db.models import DiscussionUnit, Message, ProjectChannel
 from app.db.session import async_session
 from app.pipeline.candidate_filter import CHECK_MARK_EMOJI
-from app.pipeline.reconstruction import assign_message_to_discussion_unit
 
 logger = logging.getLogger("arbordocs.discord_bot")
 
@@ -117,11 +116,6 @@ class ArborDocsBot(discord.Client):
                 created_at=message.created_at,
             )
             db.add(row)
-            await db.flush()
-            # Stage 0 (SPEC.md §5) — group into a discussion unit right after
-            # insert, so both live on_message and backfill go through the
-            # same reconstruction path.
-            await assign_message_to_discussion_unit(db, row)
             await db.commit()
 
     @staticmethod
@@ -152,16 +146,20 @@ class ArborDocsBot(discord.Client):
             message_row = await db.scalar(
                 select(Message).where(Message.discord_message_id == str(reaction.message.id))
             )
-            if message_row is None or message_row.discussion_unit_id is None:
+            if message_row is None:
                 return
             existing_reactions = list(message_row.reactions or [])
             if not any(r.get("emoji") == CHECK_MARK_EMOJI for r in existing_reactions):
                 existing_reactions.append({"emoji": CHECK_MARK_EMOJI, "count": 1})
                 message_row.reactions = existing_reactions
 
-            unit = await db.get(DiscussionUnit, message_row.discussion_unit_id)
-            if unit is not None and unit.status == "open":
-                unit.signal_close_requested = True
+            # Signal-close the unit if reconstruction has already run for this
+            # message; if not, the worker picks up the reaction via the
+            # message.reactions field during its own reconstruction pass.
+            if message_row.discussion_unit_id is not None:
+                unit = await db.get(DiscussionUnit, message_row.discussion_unit_id)
+                if unit is not None and unit.status == "open":
+                    unit.signal_close_requested = True
             await db.commit()
 
 

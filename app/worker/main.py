@@ -11,19 +11,51 @@ from app.db.models import (
     DiscussionUnit,
     GitHubInstallation,
     GoogleDriveInstallation,
+    Message,
     utcnow,
 )
 from app.db.session import async_session
 from app.ingestion.discord.client import discord_bot_client
 from app.pipeline.audit import log_event
-from app.pipeline.candidate_filter import score_unit
+from app.pipeline.candidate_filter import CHECK_MARK_EMOJI, score_unit
 from app.pipeline.drive_index import sync_drive_index
+from app.pipeline.embeddings import get_embedder
 from app.pipeline.extraction import extract_decision
 from app.pipeline.github_index import sync_repo_index
 from app.pipeline.reconciliation import reconcile_decision
+from app.pipeline.reconstruction import assign_message_to_discussion_unit
 from app.pipeline.supersession import classify_relationship
 
 logger = logging.getLogger("arbordocs.worker")
+
+
+async def run_reconstruction() -> int:
+    """Stage 0: assign raw Message rows (discussion_unit_id IS NULL) to
+    discussion units. Previously ran inline in the bot process, which forced
+    sentence-transformers to load in a 512 MB machine and caused OOM kills.
+    Moving it here keeps the bot memory-light (plain DB inserts only).
+    """
+    async with async_session() as db:
+        unassigned = (
+            await db.scalars(
+                select(Message)
+                .where(Message.discussion_unit_id.is_(None))
+                .order_by(Message.created_at.asc())
+            )
+        ).all()
+        if not unassigned:
+            return 0
+
+        embedder = get_embedder()
+        for msg in unassigned:
+            unit = await assign_message_to_discussion_unit(db, msg, embedder=embedder)
+            # Carry any ✅ reaction already on the message into a signal-close
+            # so the unit doesn't have to wait out the full inactivity window.
+            if any(r.get("emoji") == CHECK_MARK_EMOJI for r in (msg.reactions or [])):
+                if unit.status == "open":
+                    unit.signal_close_requested = True
+        await db.commit()
+        return len(unassigned)
 
 
 async def close_due_units() -> list[DiscussionUnit]:
@@ -299,6 +331,9 @@ async def run_google_sync() -> None:
 
 
 async def poll_once() -> None:
+    assigned = await run_reconstruction()
+    if assigned:
+        logger.info("reconstruction: assigned %d message(s) to discussion units", assigned)
     closed = await close_due_units()
     if closed:
         logger.info("closed %d discussion unit(s)", len(closed))
