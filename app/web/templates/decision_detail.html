@@ -109,6 +109,59 @@
         </div>
       </div>
 
+      {% if drive_installation %}
+        {% set drive_status_badge = {"drafted": "badge-amber", "applied": "badge-green", "failed": "badge-red"} %}
+        <div class="card">
+          <div class="card-hd">
+            <h3>Drafted Google Doc edit</h3>
+            {% if drafted_edit %}
+              <span class="badge {{ drive_status_badge.get(drafted_edit.status, 'badge-gray') }}">{{ drafted_edit.status|capitalize }}</span>
+            {% endif %}
+          </div>
+          <div class="card-bd stack-4">
+            {% if drafted_edit %}
+              <p class="text-sm muted">
+                Target: <span class="tag-mono">{{ drafted_edit_target.path }}#{{ drafted_edit_target.anchor }}</span>
+              </p>
+              <div class="field">
+                <label>Drafted content</label>
+                <textarea class="textarea" rows="8" readonly>{{ drafted_edit.draft_content }}</textarea>
+              </div>
+              {% if drafted_edit.status == "failed" %}
+                <p class="text-xs subtle" style="font-style:italic">The target section could not be re-located in the live doc — it may have changed since this draft was generated. Regenerate to try again.</p>
+              {% endif %}
+              <div class="row" style="gap:var(--sp-3)">
+                <form method="post" action="/decisions/{{ decision.id }}/drive-draft/regenerate">
+                  <input type="hidden" name="repo_document_id" value="{{ drafted_edit.repo_document_id }}">
+                  <button class="btn btn-block" type="submit">Regenerate</button>
+                </form>
+                {% if drafted_edit.status != "applied" %}
+                  <form method="post" action="/decisions/{{ decision.id }}/drive-draft/apply">
+                    <button class="btn btn-primary btn-block" type="submit">Apply to Google Doc</button>
+                  </form>
+                {% endif %}
+              </div>
+            {% else %}
+              <p class="text-sm subtle" style="font-style:italic">No related Drive doc section was found automatically. Pick one manually to draft an edit.</p>
+              <form method="post" action="/decisions/{{ decision.id }}/drive-draft/regenerate" class="stack-3">
+                <div class="field">
+                  <label for="repo_document_id">Target section</label>
+                  <select class="input" id="repo_document_id" name="repo_document_id" required>
+                    {% for section in drive_sections %}
+                      <option value="{{ section.id }}">{{ section.path }}#{{ section.anchor }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-block" type="submit" {% if not drive_sections %}disabled{% endif %}>Generate draft</button>
+              </form>
+              {% if not drive_sections %}
+                <p class="text-xs subtle">No indexed Drive sections available for this project yet.</p>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
       <div class="card">
         <div class="card-hd"><h3>Supersession</h3></div>
         <div class="card-bd stack-3">
