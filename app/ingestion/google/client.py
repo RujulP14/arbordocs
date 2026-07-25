@@ -1,6 +1,10 @@
+import logging
+
 import httpx
 
 from app.config import settings
+
+logger = logging.getLogger("arbordocs.google_client")
 
 GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_DRIVE_API = "https://www.googleapis.com/drive/v3"
@@ -245,6 +249,12 @@ class GoogleDriveClient:
             )
 
         match_index = next((i for i, p in enumerate(paragraphs) if p["text"] == heading_text.strip()), None)
+        logger.warning(
+            "find_section_range: file=%s looking_for=%r paragraphs_found=%r",
+            file_id,
+            heading_text.strip(),
+            [p["text"] for p in paragraphs],
+        )
         if match_index is None:
             return None
 
