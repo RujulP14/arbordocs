@@ -38,9 +38,7 @@ async def run_reconstruction() -> int:
     async with async_session() as db:
         unassigned = (
             await db.scalars(
-                select(Message)
-                .where(Message.discussion_unit_id.is_(None))
-                .order_by(Message.created_at.asc())
+                select(Message).where(Message.discussion_unit_id.is_(None)).order_by(Message.created_at.asc())
             )
         ).all()
         if not unassigned:

@@ -35,9 +35,7 @@ async def callback(
 ):
     project_id = uuid.UUID(state)
     result = await db.execute(
-        select(Project)
-        .where(Project.id == project_id)
-        .options(selectinload(Project.github_installation))
+        select(Project).where(Project.id == project_id).options(selectinload(Project.github_installation))
     )
     project = result.scalar_one_or_none()
     if project is None:
