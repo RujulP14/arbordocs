@@ -163,9 +163,9 @@ class Message(Base):
 class DiscussionUnit(Base):
     """A grouped arc of related messages — Stage 0 (SPEC.md §5).
 
-    Reconstruction is per-message bookkeeping done by the `bot` process as
-    messages arrive; closing (inactivity/signal) and Stage 1 filtering are
-    done by the `worker` process polling this table.
+    The `bot` process inserts raw Message rows; the `worker` process runs
+    reconstruction (assign_message_to_discussion_unit), closing
+    (inactivity/signal), and Stage 1 filtering each poll cycle.
     """
 
     __tablename__ = "discussion_units"
