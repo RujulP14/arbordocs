@@ -10,8 +10,15 @@ from app.web.main import app
 
 @pytest.fixture
 async def client(db_session, monkeypatch):
+    from app.db.session import get_db
+
     session_maker = async_sessionmaker(db_session.bind, expire_on_commit=False)
     monkeypatch.setattr(auth_module, "async_session", session_maker)
+
+    async def _override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override_get_db
 
     async def _fake_exchange_oauth_code(code):
         return {"access_token": "fake-token"}
@@ -21,6 +28,8 @@ async def client(db_session, monkeypatch):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac, db_session, monkeypatch
+
+    app.dependency_overrides.clear()
 
 
 def _set_identity(monkeypatch, github_login: str, email: str | None = None):
@@ -110,3 +119,37 @@ async def test_admin_login_succeeds(client):
 
     assert callback_resp.status_code == 307
     assert callback_resp.headers["location"] == "/projects"
+
+
+async def test_deverified_user_loses_access_on_next_request(client):
+    """Session cookies must not survive flipping verified=False in the DB."""
+    from app.db.models import Project
+
+    ac, db_session, monkeypatch = client
+    _set_identity(monkeypatch, "wasverified")
+    user = User(github_login="wasverified", is_admin=False, verified=True)
+    db_session.add(user)
+    await db_session.flush()
+    project = Project(name="Portal Project", created_by=user.id)
+    db_session.add(project)
+    await db_session.commit()
+
+    login_resp = await ac.get("/auth/github/start", follow_redirects=False)
+    state = login_resp.headers["location"].split("state=")[1]
+    callback_resp = await ac.get(
+        "/auth/github/callback",
+        params={"code": "fake-code", "state": state},
+        follow_redirects=False,
+    )
+    assert callback_resp.headers["location"] == "/projects"
+
+    # Still verified — portal is reachable.
+    ok = await ac.get(f"/projects/{project.id}/portal", follow_redirects=False)
+    assert ok.status_code == 200
+
+    user.verified = False
+    await db_session.commit()
+
+    portal_resp = await ac.get(f"/projects/{project.id}/portal", follow_redirects=False)
+    assert portal_resp.status_code == 303
+    assert portal_resp.headers["location"] == "/auth/github/login"
