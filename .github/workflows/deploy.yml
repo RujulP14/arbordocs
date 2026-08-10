@@ -18,8 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # setup-flyctl has no stable action tags; pin the commit + flyctl binary.
       - name: Set up flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
+        with:
+          version: "0.4.80"
 
       - name: Deploy (release_command in fly.toml runs `alembic upgrade head`)
         run: flyctl deploy --remote-only

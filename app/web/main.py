@@ -14,7 +14,15 @@ from app.web import (
     projects,
 )
 
-app = FastAPI(title="ArborDocs")
+# OpenAPI UI is useful locally; leave it off in non-dev so route maps aren't
+# public on the Fly hostname.
+_docs_enabled = settings.env == "development"
+app = FastAPI(
+    title="ArborDocs",
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
+)
 app.add_middleware(SessionMiddleware, secret_key=settings.session_secret)
 
 app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
