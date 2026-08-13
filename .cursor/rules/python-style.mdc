@@ -1,0 +1,25 @@
+---
+description: Python style — ruff, typing, logging, async SQLAlchemy
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python Conventions
+
+- Target Python 3.12; follow existing Ruff config in `pyproject.toml` (line length 110).
+- Prefer modern typing (`list[str]`, `X | None`) over `Optional`/`List`.
+- Async DB access via SQLAlchemy async sessions (`app/db/session.py`). Do not block the event loop with sync I/O in request/worker paths.
+- Config via `pydantic-settings` in `app/config.py` — add new env knobs there and `.env.example`.
+- Logging: `logger = logging.getLogger("arbordocs.<module>")`. Include useful ids in messages (`project_id`, `decision_id`), never secrets.
+- Keep FastAPI route handlers thin: parse/validate → call pipeline/service → return template or JSON.
+- Match import style already used in the touched file (Ruff `I` isort is enforced).
+
+```python
+# ❌ BAD
+print(token)
+await session.execute(text(f"SELECT * FROM decisions WHERE id = '{id}'"))
+
+# ✅ GOOD
+logger.info("approved decision=%s project=%s", decision.id, project.id)
+result = await session.get(Decision, decision_id)
+```

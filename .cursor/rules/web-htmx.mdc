@@ -1,0 +1,16 @@
+---
+description: FastAPI + Jinja2 + HTMX web UI conventions
+globs: "app/web/**/*"
+alwaysApply: false
+---
+
+# Web UI Rules
+
+- Server-render with Jinja2 templates under `app/web/templates/`. Use HTMX for partial updates (approve/reject/edit, pickers).
+- Do not introduce React/Vue/Next or a bundler for the admin/portal UI.
+- Auth: GitHub OAuth; pending users until `verified` / `is_admin` (ADR-0006, ADR-0008).
+- Portal shows only approved decision states — never expose `proposed` there.
+- Keep route modules focused (`auth.py`, `projects.py`, `decisions.py`, `portal.py`, integrations_*).
+- Use shared deps from `app/web/deps.py` and templating helpers from `app/web/templating.py`.
+- Prefer progressive enhancement: forms should work; HTMX improves UX.
+- Add or update tests in `tests/test_web_*.py` / `tests/test_auth.py` for behavior changes.

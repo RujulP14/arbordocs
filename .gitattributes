@@ -1,0 +1,4 @@
+# Keep shell hooks runnable on Windows checkouts
+*.sh text eol=lf
+scripts/pre-commit text eol=lf
+.githooks/pre-commit text eol=lf

@@ -1,0 +1,24 @@
+---
+description: Pipeline stage boundaries and decision lifecycle
+globs: "app/pipeline/**/*.py,app/worker/**/*.py"
+alwaysApply: false
+---
+
+# Pipeline Rules
+
+Stages (see `docs/ARCHITECTURE.md`):
+
+0. Reconstruction → discussion units  
+1. Candidate filter (high recall)  
+2. LLM gate + extraction → `status=proposed`  
+3. Supersession vs active decisions  
+Then: reconciliation vs GitHub/Drive index; human review elsewhere.
+
+- Keep stages pure and testable; worker orchestration stays in `app/worker/main.py`.
+- `project_id` is a hard boundary — never merge or compare across projects.
+- Extraction must cite grounding `message_ids`. Do not invent sources.
+- Supersession relations: `unrelated` | `amendment` | `reversal` | `duplicate`.
+- Reconciliation surfaces candidates for humans; do not silently rewrite code/docs.
+- Append audit events for meaningful writes (`app/pipeline/audit.py`).
+- LLM calls: prefer existing Groq/Ollama helpers; keep prompts/schemas versioned with the stage.
+- When changing Stage 1/2 behavior, update or add coverage in `tests/` and consider `eval/`.

@@ -1,0 +1,14 @@
+---
+description: Secrets, OAuth, and security hygiene
+alwaysApply: true
+---
+
+# Security
+
+- Never commit `.env`, private keys, bot tokens, or webhook secrets.
+- Platform secrets: env / Fly secrets. Project-scoped OAuth tokens: Postgres only.
+- Do not log tokens, private keys, session cookies, or Authorization headers.
+- `/docs`, `/redoc`, OpenAPI stay disabled unless `ENV=development`.
+- Treat webhook handlers as untrusted input; verify signatures (GitHub webhook secret).
+- Channel attachment is the ingestion allowlist — do not broaden to whole-guild ingest.
+- When adding allowlists for secret scanners, prefer path/example-file allowlists over disabling rules.

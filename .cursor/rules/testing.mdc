@@ -1,0 +1,14 @@
+---
+description: Pytest and eval harness expectations
+globs: "tests/**/*.py,eval/**/*.py"
+alwaysApply: false
+---
+
+# Testing Rules
+
+- Unit/integration tests: `tests/test_*.py` with shared fixtures in `tests/conftest.py`.
+- `pytest-asyncio` is `asyncio_mode = auto` — prefer async tests for DB/HTTP paths.
+- Prefer focused tests that lock behavior at stage/module boundaries over huge end-to-end only suites.
+- Decision-detection quality: `eval/harness.py` + labeled dataset — update when changing Stage 1/2 recall/precision tradeoffs.
+- Do not commit real Discord/GitHub payloads containing secrets; scrub fixtures.
+- CI runs migrations against Postgres+pgvector, `alembic check`, then `pytest` — keep tests green locally the same way when touching schema.

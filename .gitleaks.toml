@@ -1,0 +1,36 @@
+title = "ArborDocs gitleaks config"
+
+# Extend the default gitleaks ruleset rather than redefining rules from scratch.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist — paths and patterns that are never real secrets"
+paths = [
+  '''.*\.env\.example$''',
+  '''(^|/)\.venv/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)coverage/''',
+  '''(^|/)\.pytest_cache/''',
+  '''(^|/)\.ruff_cache/''',
+  '''uv\.lock$''',
+  '''(^|/)docs/''',
+  '''(^|/)\.cursor/''',
+  '''AGENTS\.md$''',
+]
+
+# Soften generic-api-key noise for obvious test/ci placeholders while still
+# catching real-looking assignments elsewhere.
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+regexes = [
+  '''(?i)(ci-test|changeme|placeholder|your[-_]?|example|dummy)''',
+  '''whsec_test_[a-zA-Z0-9_]*''',
+]
+paths = [
+  '''(^|/)tests/''',
+  '''(^|/)eval/''',
+  '''\.github/workflows/''',
+]
