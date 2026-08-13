@@ -1,0 +1,17 @@
+---
+description: ArborDocs hard architectural and process rules (always on)
+alwaysApply: true
+---
+
+# Hard Rules
+
+- Branch off `main`; never commit directly to `main`.
+- Stack is Python 3.12+ only for app code: FastAPI + Jinja2 + HTMX. Do not add a separate JS SPA/build.
+- Ingest Discord + GitHub as primary sources; Drive is optional. Do not add Slack/Jira/Notion connectors without an ADR.
+- Decisions extracted by the pipeline start as `proposed`. Do not auto-activate or auto-publish.
+- Use `uv` for deps (`uv sync`, `uv run …`). Do not introduce npm/pnpm/yarn for app code.
+- Never commit secrets (`.env`, keys, tokens). Prefer `.env.example` placeholders.
+- Prefer `logging.getLogger("arbordocs…")` over `print`.
+- Schema changes go through Alembic (`migrations/versions/`). Keep models and migrations in sync (`alembic check`).
+- Put unit/integration tests in `tests/`. Put eval datasets/harness in `eval/`.
+- Read `AGENTS.md` and the relevant ADR under `docs/decisions/` before changing boundaries.

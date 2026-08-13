@@ -1,0 +1,106 @@
+#!/bin/sh
+# ArborDocs pre-commit hook — portable sh (Git Bash / macOS / Linux).
+# Install: sh scripts/install-hooks.sh
+
+set -eu
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+cd "$REPO_ROOT"
+
+# ─── 0. Resolve uv / venv for worktrees ───────────────────────────────────────
+GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null || true)
+if [ -n "$GIT_COMMON_DIR" ]; then
+  MAIN_REPO_ROOT=$(cd "$(dirname "$GIT_COMMON_DIR")" && pwd)
+  if [ ! -d "$REPO_ROOT/.venv" ] && [ -x "$MAIN_REPO_ROOT/.venv/bin/python" ]; then
+    export VIRTUAL_ENV="$MAIN_REPO_ROOT/.venv"
+    export PATH="$MAIN_REPO_ROOT/.venv/bin:$PATH"
+  elif [ ! -d "$REPO_ROOT/.venv" ] && [ -x "$MAIN_REPO_ROOT/.venv/Scripts/python.exe" ]; then
+    export VIRTUAL_ENV="$MAIN_REPO_ROOT/.venv"
+    export PATH="$MAIN_REPO_ROOT/.venv/Scripts:$PATH"
+  fi
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "ERROR: uv not found on PATH. Install: https://docs.astral.sh/uv/"
+  exit 1
+fi
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR || true)
+
+# ─── 1. Block direct commits to main/master ───────────────────────────────────
+branch=$(git symbolic-ref HEAD 2>/dev/null | sed 's|refs/heads/||' || true)
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "ERROR: Direct commits to $branch are not allowed."
+  echo "Create a feature branch first: git checkout -b your-branch-name"
+  exit 1
+fi
+
+# ─── 2. Block secrets / env files ─────────────────────────────────────────────
+BAD_ENV=$(echo "$STAGED" | grep -E '(^|/)\.env$|(^|/)\.env\.[^/]+$' | grep -vE '\.env\.example$' || true)
+if [ -n "$BAD_ENV" ]; then
+  echo "ERROR: Env/secret files are staged:"
+  echo "$BAD_ENV"
+  echo "Unstage with: git reset HEAD <file>"
+  exit 1
+fi
+
+BAD_ART=$(echo "$STAGED" | grep -E '(^|/)coverage/|(^|/)\.coverage$|\.pem$|id_rsa$' || true)
+if [ -n "$BAD_ART" ]; then
+  echo "ERROR: Coverage artifacts or private key files are staged:"
+  echo "$BAD_ART"
+  exit 1
+fi
+
+# ─── 3. Warn on migration / model changes ─────────────────────────────────────
+if echo "$STAGED" | grep -qE '^migrations/|^app/db/models\.py$'; then
+  echo "⚠️  Schema-related files staged (migrations and/or models)."
+  echo "    Verify locally: uv run alembic upgrade head && uv run alembic check"
+fi
+
+# ─── 4. Migration naming sanity ───────────────────────────────────────────────
+if echo "$STAGED" | grep -q '^migrations/versions/'; then
+  BAD_MIG=$(echo "$STAGED" | grep '^migrations/versions/' | grep -vE 'versions/[0-9]{4}_[a-z0-9_]+\.py$' || true)
+  if [ -n "$BAD_MIG" ]; then
+    echo "ERROR: Migration filename should look like NNNN_snake_case.py:"
+    echo "$BAD_MIG"
+    exit 1
+  fi
+fi
+
+# ─── 5. Ruff format + lint on staged Python files ─────────────────────────────
+PY_STAGED=$(echo "$STAGED" | grep -E '\.py$' || true)
+if [ -n "$PY_STAGED" ]; then
+  echo "Running ruff format on staged Python files..."
+  echo "$PY_STAGED" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    uv run ruff format "$f"
+    git add -- "$f"
+  done
+
+  echo "Running ruff check on staged Python files..."
+  echo "$PY_STAGED" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    uv run ruff check "$f"
+  done
+fi
+
+# ─── 6. Optional gitleaks (if installed) ──────────────────────────────────────
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "Running gitleaks protect on staged changes..."
+  gitleaks protect --staged --config .gitleaks.toml --verbose
+else
+  echo "⚠️  gitleaks not found — skipping secret scan."
+  echo "    Install: https://github.com/gitleaks/gitleaks"
+fi
+
+# ─── 7. Focused pytest when test files are staged ─────────────────────────────
+TEST_FILES=$(echo "$STAGED" | grep -E '^tests/.*\.py$' || true)
+if [ -n "$TEST_FILES" ]; then
+  echo "Running staged tests..."
+  echo "$TEST_FILES" | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    uv run pytest "$f" -q
+  done
+fi
+
+echo "✅ Pre-commit checks passed."

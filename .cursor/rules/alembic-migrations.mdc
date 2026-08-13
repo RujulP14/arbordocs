@@ -1,0 +1,15 @@
+---
+description: Alembic migration and SQLAlchemy model conventions
+globs: "migrations/**/*.py,app/db/**/*.py"
+alwaysApply: false
+---
+
+# Migrations & Models
+
+- Models live in `app/db/models.py`. Migrations live in `migrations/versions/`.
+- Naming: sequential `NNNN_snake_case.py` with matching `revision` id (e.g. `0012_repo_doc_source_file_id`).
+- Always provide both `upgrade()` and `downgrade()` when practical.
+- After model edits: `uv run alembic revision -m "…" --autogenerate`, review the file, then `uv run alembic upgrade head`.
+- Before PR: `uv run alembic check` must pass (models vs head migration).
+- Multi-tenant tables that are project-scoped must include `project_id` and respect that boundary in queries.
+- Do not edit old migrations that may already be applied in shared/prod DBs — add a new revision instead.
