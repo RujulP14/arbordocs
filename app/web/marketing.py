@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 
 from app.db.models import User
 from app.web.deps import get_current_user
+from app.web.privacy_policy import privacy_policy_html
 from app.web.templating import templates
 
 router = APIRouter(tags=["marketing"])
@@ -23,6 +24,15 @@ async def pricing(request: Request, user: User | None = Depends(get_current_user
 @router.get("/support")
 async def support(request: Request, sent: bool = False, user: User | None = Depends(get_current_user)):
     return templates.TemplateResponse(request, "marketing_support.html", {"user": user, "sent": sent})
+
+
+@router.get("/privacy")
+async def privacy(request: Request, user: User | None = Depends(get_current_user)):
+    return templates.TemplateResponse(
+        request,
+        "marketing_privacy.html",
+        {"user": user, "policy_html": privacy_policy_html()},
+    )
 
 
 @router.post("/support/contact")

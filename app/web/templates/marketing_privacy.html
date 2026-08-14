@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy · ArborDocs{% endblock %}
+{% block brand_href %}/{% endblock %}
+{% block nav %}
+  <a href="/">Product</a>
+  <a href="/pricing">Pricing</a>
+  <a href="/support">Support</a>
+{% endblock %}
+{% block main %}
+  <section class="container privacy-page">
+    <article class="privacy-body">
+      {{ policy_html | safe }}
+    </article>
+  </section>
+{% endblock %}
